@@ -1,0 +1,8 @@
+GPIO.sln
+GPIO.vcxproj
+GPIO.vcxproj.user
+
+/obj
+/bin
+/.vs
+/readme
