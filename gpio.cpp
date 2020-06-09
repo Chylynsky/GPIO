@@ -2,36 +2,85 @@
 
 namespace rpi4b
 {
-	gpio::gpio(uint32_t pin_number, GPIODirection direction) : gpfsel_reg{ nullptr }, pin_number { pin_number }, direction{ direction }
+	GPIO::GPIO(uint32_t pinNumber, GPIODirection direction) : pinNumber { pinNumber }, direction{ direction }
 	{
-		if (direction == GPIODirection::OUTPUT) {
-			auto fsel = GPIOFunctionSelect::GPIO_PIN_AS_OUTPUT;
+		// Select GPIO function select register
+		switch (pinNumber / 10U)
+		{
+		case 0: functionSelectRegister = GetRegisterPtr(GPFSEL0); break;
+		case 1: functionSelectRegister = GetRegisterPtr(GPFSEL1); break;
+		case 2: functionSelectRegister = GetRegisterPtr(GPFSEL2); break;
+		case 3: functionSelectRegister = GetRegisterPtr(GPFSEL3); break;
+		case 4: functionSelectRegister = GetRegisterPtr(GPFSEL4); break;
+		case 5: functionSelectRegister = GetRegisterPtr(GPFSEL5); break;
+		default: throw std::runtime_error("Pin number out of range."); break;
+		}
 
-			// Set GPIO function select register value for the selected pin
-			if (pin_number <= 9) {
-				gpfsel_reg = reinterpret_cast<uint32_t*>(GPFSEL0);
-				bit_offset = pin_number * GPFSEL_PIN_BIT_SIZE;
-			}
-			else if (pin_number >= 10 && pin_number <= 19) {
-				gpfsel_reg = reinterpret_cast<uint32_t*>(GPFSEL1);
-				bit_offset = (pin_number - 10) * GPFSEL_PIN_BIT_SIZE;
-			}
-			else if (pin_number >= 20 && pin_number <= 27) {
-				gpfsel_reg = reinterpret_cast<uint32_t*>(GPFSEL2);
-				bit_offset = (pin_number - 20) * GPFSEL_PIN_BIT_SIZE;
-			}
-			else {
-				throw std::runtime_error("GPIO pins available are 0 to 27.");
-			}
+		// 31 pins are described by the first GPSET and GPCLR registers
+		if (pinNumber < 32U) 
+		{
+			setRegister = GetRegisterPtr(GPSET0);
+			clrRegister = GetRegisterPtr(GPCLR0);
+		}
+		else 
+		{
+			setRegister = GetRegisterPtr(GPSET1);
+			clrRegister = GetRegisterPtr(GPCLR1);
+		}
 
-			*gpfsel_reg |= static_cast<uint32_t>(fsel) << bit_offset;
+		// If the direction is set to INPUT there is no need to change the register value
+		if (direction == GPIODirection::INPUT) 
+		{
+			return;
+		}
+
+		auto functionSelected = GPIOFunctionSelect::GPIO_PIN_AS_OUTPUT;
+		*functionSelectRegister &= ~(0b111U << (GPFSEL_PIN_BIT_SIZE * (pinNumber % 10U)));
+		*functionSelectRegister |= static_cast<uint32_t>(functionSelected) << (GPFSEL_PIN_BIT_SIZE * (pinNumber % 10U));
+	}
+
+	GPIO::~GPIO()
+	{
+		if (direction == GPIODirection::OUTPUT) 
+		{
+			*clrRegister |= 1U << pinNumber;
+			*functionSelectRegister &= ~(0b111U << (GPFSEL_PIN_BIT_SIZE * (pinNumber % 10U)));
 		}
 	}
 
-	gpio::~gpio()
+	void GPIO::Write(uint32_t state) noexcept
 	{
-		if (direction == GPIODirection::OUTPUT) {
-			*gpfsel_reg |= static_cast<uint32_t>(GPIOFunctionSelect::GPIO_PIN_AS_INPUT) << bit_offset;
+		if (!state) 
+		{
+			*clrRegister |= 1U << (pinNumber % 32U);
+		}
+		else 
+		{
+			*setRegister |= 1U << (pinNumber % 32U);
+		}
+	}
+
+	void GPIO::Write(bool state) noexcept
+	{
+		if (!state)
+		{
+			*clrRegister |= 1U << (pinNumber % 32U);
+		}
+		else
+		{
+			*setRegister |= 1U << (pinNumber % 32U);
+		}
+	}
+
+	void GPIO::Write(GPIOState state) noexcept
+	{
+		if (state == GPIOState::LOW)
+		{
+			*clrRegister |= 1U << (pinNumber % 32U);
+		}
+		else
+		{
+			*setRegister |= 1U << (pinNumber % 32U);
 		}
 	}
 }
