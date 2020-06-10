@@ -1,7 +1,7 @@
-﻿#include <iostream>
+﻿// Example blink program
+
 #include <thread>
 #include <chrono>
-#include <limits>
 #include "gpio.h"
 
 using namespace std::chrono_literals;
@@ -11,10 +11,10 @@ int main()
 {
     gpio<output> pin(26U);
 
-    for (int i = 0; i < 10; i++) {
-        pin.write(1U);
+    for (int i = 0; i < 50; i++) {
+        pin.write(true);
         std::this_thread::sleep_for(200ms);
-        pin.write(0U);
+        pin.write(false);
         std::this_thread::sleep_for(200ms);
     }
 

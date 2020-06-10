@@ -24,14 +24,14 @@ namespace rpi4b
 	// Values for GPFSEL registers
 	enum class GPIOFunctionSelect
 	{
-		GPIO_PIN_AS_INPUT = 0b000U,
-		GPIO_PIN_AS_OUTPUT = 0b001U,
-		GPIO_PIN_ALTERNATE_FUNCTION_0 = 0b100U,
-		GPIO_PIN_ALTERNATE_FUNCTION_1 = 0b101U,
-		GPIO_PIN_ALTERNATE_FUNCTION_2 = 0b110U,
-		GPIO_PIN_ALTERNATE_FUNCTION_3 = 0b111U,
-		GPIO_PIN_ALTERNATE_FUNCTION_4 = 0b011U,
-		GPIO_PIN_ALTERNATE_FUNCTION_5 = 0b010U
+		GPIO_PIN_AS_INPUT				= 0b000U,
+		GPIO_PIN_AS_OUTPUT				= 0b001U,
+		GPIO_PIN_ALTERNATE_FUNCTION_0	= 0b100U,
+		GPIO_PIN_ALTERNATE_FUNCTION_1	= 0b101U,
+		GPIO_PIN_ALTERNATE_FUNCTION_2	= 0b110U,
+		GPIO_PIN_ALTERNATE_FUNCTION_3	= 0b111U,
+		GPIO_PIN_ALTERNATE_FUNCTION_4	= 0b011U,
+		GPIO_PIN_ALTERNATE_FUNCTION_5	= 0b010U
 	};
 
 	// GPIO pin output set offsets
@@ -80,7 +80,15 @@ namespace rpi4b
 	inline constexpr uint32_t GPIO_PUP_PDN_CNTRL_REG2	{ 0xECU / sizeof(uint32_t) };	// GPIO pull-up/pull-down register 2
 	inline constexpr uint32_t GPIO_PUP_PDN_CNTRL_REG3	{ 0xF0U / sizeof(uint32_t) };	// GPIO pull-up/pull-down register 3
 
-	class __Get_reg_ptr
+	// Values for GPFSEL registers
+	enum class ResistorSelect
+	{
+		NO_PULL		= 0b00,
+		PULL_UP		= 0b01,
+		PULL_DOWN	= 0b10
+	};
+
+	class __get_reg_ptr
 	{
 		static volatile uint32_t* GPIO_REGISTER_BASE_MAPPED;
 
@@ -114,7 +122,7 @@ namespace rpi4b
 		}
 	};
 
-	inline volatile uint32_t* __Get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
+	inline volatile uint32_t* __get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __get_reg_ptr::MapMemoryAddressSpace() };
 
-	inline static __Get_reg_ptr get_reg_ptr;
+	inline constexpr __get_reg_ptr get_reg_ptr;
 }
