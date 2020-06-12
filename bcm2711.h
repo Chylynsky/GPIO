@@ -19,7 +19,7 @@ namespace rpi4b
 	constexpr uint32_t GPFSEL5	{ 0x14U / sizeof(uint32_t) };	// GPIO function select 5
 
 	// Values for GPFSEL registers
-	enum class gpio_fsel_reg_value
+	enum class function_select
 	{
 		gpio_pin_as_input				= 0b000U,
 		gpio_pin_as_output				= 0b001U,
@@ -78,7 +78,7 @@ namespace rpi4b
 	constexpr uint32_t GPIO_PUP_PDN_CNTRL_REG3	{ 0xF0U / sizeof(uint32_t) };	// GPIO pull-up/pull-down register 3
 
 	// Values for GPFSEL registers
-	enum class gpio_pup_pdn_cntrl_value
+	enum class pull_selection
 	{
 		no_pull		= 0b00U,
 		pull_up		= 0b01U,

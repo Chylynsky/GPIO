@@ -5,12 +5,52 @@
 #include <cstdint>
 #include <stdexcept>
 #include <functional>
+#include <iostream>
+#include <map>
+#include <future>
+#include <utility>
+#include <thread>
 
 namespace rpi4b
 {
+	using callback_t = std::function<void(void)>;
+
 	struct __gpio_input_regs
 	{
+		static std::multimap<uint32_t, callback_t> callback_map;
+		static std::thread event_poll_thr;
+		static std::mutex event_poll_mtx;
+
 		volatile uint32_t* lev_reg;
+
+		static void poll_events()
+		{
+			volatile uint32_t* base_event_reg = get_reg_ptr(GPEDS0);
+
+			while (true)
+			{
+				std::lock_guard<std::mutex> lock(event_poll_mtx);
+
+				if (callback_map.empty())
+				{
+					break;
+				}
+
+				for (const auto& callback_pair : callback_map)
+				{
+					uint32_t reg_index = callback_pair.first / 32U;
+					uint32_t bit_index = callback_pair.first % 32U;
+
+					if (((*(base_event_reg + reg_index) >> bit_index) & 1U) == 1U)
+					{
+						// Clear bit value
+						*(base_event_reg + reg_index) &= ~(1U << bit_index);
+						// Call event callback
+						callback_pair.second();
+					}
+				}
+			}
+		}
 	};
 
 	struct __gpio_output_regs
@@ -48,19 +88,19 @@ namespace rpi4b
 
 		// Read current GPIO pin state
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, uint32_t> read() noexcept;
+		Enable_if<Is_input<_Ty>, uint32_t> read() const noexcept;
 
 		// Set pull-up, pull-down or no resistor
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, void> set_pull(gpio_pup_pdn_cntrl_value pull_sel) noexcept;
+		Enable_if<Is_input<_Ty>, void> set_pull(pull_selection pull_sel) noexcept;
 
 		// Get current pull type
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, gpio_pup_pdn_cntrl_value> get_pull() noexcept;
+		Enable_if<Is_input<_Ty>, pull_selection> get_pull() noexcept;
 
 		// Set event callback
 		template<typename _Ev, typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> attach_event_callback(std::function<void(void)>) noexcept;
+		Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> attach_event_callback(callback_t) noexcept;
 	};
 
 	template<typename _Dir>
@@ -86,6 +126,7 @@ namespace rpi4b
 
 		// Clear function select register bits
 		*fsel_reg &= ~(0b111U << (3 * (pin_number % 10U)));
+
 		uint32_t reg_index = pin_number / 32U;
 
 		// Enable only when instantiated with input template parameter
@@ -97,7 +138,7 @@ namespace rpi4b
 		// Enable only when instantiated with output template parameter
 		if constexpr (Is_output<_Dir>)
 		{
-			*fsel_reg |= static_cast<uint32_t>(gpio_fsel_reg_value::gpio_pin_as_output) << (3U * (pin_number % 10U));
+			*fsel_reg |= static_cast<uint32_t>(function_select::gpio_pin_as_output) << (3U * (pin_number % 10U));
 
 			// 31 pins are described by the first GPSET and GPCLR registers
 			__gpio_output_regs::set_reg = get_reg_ptr(GPSET0 + reg_index);
@@ -111,8 +152,38 @@ namespace rpi4b
 		// Enable only when instantiated with input template parameter
 		if constexpr (Is_input<_Dir>)
 		{
+			{
+				std::lock_guard<std::mutex> lock(__gpio_input_regs::event_poll_mtx);
+
+				// Erase event callback from callback map
+				__gpio_input_regs::callback_map.erase(pin_number);
+			}
+
+			uint32_t bit_clr_val = ~reg_bit_set_val;
+			uint32_t reg_index = pin_number / 32U;
+
+			// Clear event detect bits
+			*get_reg_ptr(GPREN0 + reg_index) &= bit_clr_val;
+			*get_reg_ptr(GPFEN0 + reg_index) &= bit_clr_val;
+			*get_reg_ptr(GPHEN0 + reg_index) &= bit_clr_val;
+			*get_reg_ptr(GPLEN0 + reg_index) &= bit_clr_val;
+			*get_reg_ptr(GPAREN0 + reg_index) &= bit_clr_val;
+			*get_reg_ptr(GPAFEN0 + reg_index) &= bit_clr_val;
+
 			// Set pull-down resistor
-			set_pull(gpio_pup_pdn_cntrl_value::pull_down);
+			set_pull(pull_selection::pull_down);
+
+			// Wait for the polling thread to exit if callback map is empty
+			if (!__gpio_input_regs::callback_map.empty())
+			{
+				return;
+			}
+
+			// If the last event-listening gpio pin is being removed, join the polling thread
+			if (__gpio_input_regs::event_poll_thr.joinable())
+			{
+				__gpio_input_regs::event_poll_thr.join();
+			}
 		}
 
 		// Enable only when instantiated with output template parameter
@@ -128,7 +199,7 @@ namespace rpi4b
 	template<typename _Arg, typename _Ty>
 	inline Enable_if<Is_output<_Ty>, void> gpio<_Dir>::write(_Arg state) noexcept
 	{
-		static_assert(Is_convertible<_Ty, bool>, "Type must be convertible to bool.");
+		static_assert(Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
 
 		if (!state)
 		{
@@ -142,14 +213,14 @@ namespace rpi4b
 
 	template<typename _Dir>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, uint32_t> gpio<_Dir>::read() noexcept
+	inline Enable_if<Is_input<_Ty>, uint32_t> gpio<_Dir>::read() const noexcept
 	{
 		return (*__gpio_input_regs::lev_reg >> (pin_number % 32U)) & 0x1U;
 	}
 
 	template<typename _Dir>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, void> gpio<_Dir>::set_pull(gpio_pup_pdn_cntrl_value pull_sel) noexcept
+	inline Enable_if<Is_input<_Ty>, void> gpio<_Dir>::set_pull(pull_selection pull_sel) noexcept
 	{
 		// 16 pins are controlled by each register
 		volatile uint32_t* reg_sel = get_reg_ptr(GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
@@ -159,20 +230,37 @@ namespace rpi4b
 
 	template<typename _Dir>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, gpio_pup_pdn_cntrl_value> gpio<_Dir>::get_pull() noexcept
+	inline Enable_if<Is_input<_Ty>, pull_selection> gpio<_Dir>::get_pull() noexcept
 	{
 		// 16 pins are controlled by each register
 		volatile uint32_t* reg_sel = get_reg_ptr(GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
-		return static_cast<gpio_pup_pdn_cntrl_value>((*reg_sel >> ((2U * (pin_number % 16U))) & 0x3U));
+		return static_cast<pull_selection>((*reg_sel >> ((2U * (pin_number % 16U))) & 0x3U));
 	}
 
 	template<typename _Dir>
 	template<typename _Ev, typename _Ty>
-	inline Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> gpio<_Dir>::attach_event_callback(std::function<void(void)>) noexcept
+	inline Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> gpio<_Dir>::attach_event_callback(callback_t callback) noexcept
 	{
 		// Get event register based on event type
 		volatile uint32_t* event_reg = get_reg_ptr(Event_reg_offs<_Ev> + pin_number / 32U);
 		// Set bit responsible for the selected pin
-		//*event_reg |= reg_bit_set_val;
+		*event_reg |= reg_bit_set_val;
+
+		if (__gpio_input_regs::callback_map.empty())
+		{
+			if (__gpio_input_regs::event_poll_thr.joinable())
+			{
+				__gpio_input_regs::event_poll_thr.join();
+			}
+
+			std::lock_guard<std::mutex> lock(__gpio_input_regs::event_poll_mtx);
+			__gpio_input_regs::callback_map.insert(std::make_pair(pin_number, callback));
+			__gpio_input_regs::event_poll_thr = std::thread(__gpio_input_regs::poll_events);
+		}
+		else
+		{
+			std::lock_guard<std::mutex> lock(__gpio_input_regs::event_poll_mtx);
+			__gpio_input_regs::callback_map.insert(std::make_pair(pin_number, callback));
+		}
 	}
 }
