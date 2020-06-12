@@ -5,6 +5,9 @@
 
 namespace rpi4b
 {
+	// Each event type has 'value' field representing
+	// the base register used to turn on pin event detection
+
 	struct rising_edge
 	{
 		static constexpr uint32_t value = GPREN0;
@@ -36,10 +39,10 @@ namespace rpi4b
 	};
 
 	template<typename _Ev>
-	inline constexpr uint32_t Event_reg_offs = _Ev::value;
+	constexpr uint32_t Event_reg_offs = _Ev::value;
 
 	template<typename _Ty>
-	inline constexpr bool Is_event = 
+	constexpr bool Is_event = 
 		Is_same<_Ty, rising_edge>			|| 
 		Is_same<_Ty, falling_edge>			|| 
 		Is_same<_Ty, pin_high>				|| 

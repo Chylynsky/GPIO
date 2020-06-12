@@ -10,10 +10,10 @@ namespace rpi4b
 	using Select_if = typename std::conditional_t<_Cond, Iftrue, Iffalse>;
 
 	template<typename _Ty1, typename _Ty2>
-	inline constexpr bool Is_same = std::is_same_v<_Ty1, _Ty2>;
+	constexpr bool Is_same = std::is_same_v<_Ty1, _Ty2>;
 
 	template<typename _From, typename _To>
-	inline constexpr bool Is_convertible = std::is_convertible_v<_From, _To>;
+	constexpr bool Is_convertible = std::is_convertible_v<_From, _To>;
 
 	struct input
 	{};
@@ -22,8 +22,8 @@ namespace rpi4b
 	{};
 
 	template<typename _Dir>
-	inline constexpr bool Is_input = Is_same<_Dir, input>;
+	constexpr bool Is_input = Is_same<_Dir, input>;
 
 	template<typename _Dir>
-	inline constexpr bool Is_output = Is_same<_Dir, output>;
+	constexpr bool Is_output = Is_same<_Dir, output>;
 }
