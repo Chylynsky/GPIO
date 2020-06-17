@@ -1,8 +1,4 @@
 #pragma once
-#include "bcm2711.h"
-#include "gpio_predicates.h"
-#include "gpio_events.h"
-#include "dispatch_queue.h"
 #include <poll.h>
 #include <cstdint>
 #include <stdexcept>
@@ -13,6 +9,14 @@
 #include <utility>
 #include <thread>
 
+#include "bcm2711.h"
+#include "gpio_predicates.h"
+#include "gpio_events.h"
+#include "dispatch_queue.h"
+#include "gpio_input.h"
+#include "gpio_output.h"
+#include "gpio_aliases.h"
+
 /*
 	TO DO:
 	- implement linux based polling for /dev/gpiomem instead of while-based
@@ -22,49 +26,6 @@
 
 namespace rpi4b
 {
-	using callback_t = std::function<void(void)>;
-
-	template<typename _Reg>
-	struct __gpio_input
-	{
-		static std::multimap<_Reg, callback_t> callback_map;
-		static std::thread event_poll_thread;
-		static std::mutex event_poll_mtx;
-
-		static dispatch_queue<callback_t> callback_queue;
-
-		volatile _Reg* lev_reg;
-
-		static void poll_events()
-		{
-			volatile _Reg* base_event_reg = get_reg_ptr(GPEDS0);
-
-			while (true)
-			{
-				if (callback_map.empty())
-				{
-					break;
-				}
-
-				// poll file descriptor ?
-
-				std::lock_guard<std::mutex> lock(event_poll_mtx);
-			}
-		}
-	};
-
-	template<typename _Reg>
-	std::multimap<_Reg, callback_t> __gpio_input<_Reg>::callback_map;
-	template<typename _Reg>
-	std::mutex __gpio_input<_Reg>::event_poll_mtx;
-
-	template<typename _Reg>
-	struct __gpio_output
-	{
-		volatile _Reg* set_reg;
-		volatile _Reg* clr_reg;
-	};
-
 	template<typename _Dir, typename _Reg = uint32_t>
 	class gpio : private Select_if<Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
 	{

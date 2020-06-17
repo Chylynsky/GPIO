@@ -1,7 +1,7 @@
 #pragma once
+#include <cstdint>
 #include "bcm2711.h"
 #include "gpio_predicates.h"
-#include <cstdint>
 
 namespace rpi4b
 {
