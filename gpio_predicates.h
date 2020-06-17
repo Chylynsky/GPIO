@@ -15,11 +15,16 @@ namespace rpi4b
 	template<typename _From, typename _To>
 	constexpr bool Is_convertible = std::is_convertible_v<_From, _To>;
 
+	template<typename _Ty>
+	constexpr bool Is_integral = std::is_integral_v<_Ty>;
+
 	struct input
-	{};
+	{
+	};
 
 	struct output
-	{};
+	{
+	};
 
 	template<typename _Dir>
 	constexpr bool Is_input = Is_same<_Dir, input>;

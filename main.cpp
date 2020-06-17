@@ -4,6 +4,7 @@
 #include <chrono>
 #include <iostream>
 #include "gpio.h"
+#include "dispatch_queue.h"
 
 using namespace std;
 using namespace std::chrono_literals;
@@ -12,15 +13,28 @@ using namespace rpi4b;
 
 int main()
 {
-    {
-        gpio<input> pin(26U);
-        pin.set_pull(pull_selection::pull_down);
-        sleep_for(200ms);
-        //pin.attach_event_callback<pin_high>([]() { cout << "High state detected!" << endl; });
-        sleep_for(200ms);
-        pin.set_pull(pull_selection::pull_up);
-    }
+    auto x = []() { std::cout << "1!"; };
+    auto y = []() { std::cout << "2!"; };
+    auto z = []() { std::cout << "3!"; };
 
+    dispatch_queue<std::function<void(void)>> cq;
+
+    sleep_for(200ms);
+
+    cq.push(x);
+    cq.push(y);
+    cq.push(z);
+
+    sleep_for(200ms);
+
+    cq.push(x);
+    cq.push(y);
+    cq.push(z);
+
+    sleep_for(200ms);
+
+    //gpio<output> pin(26U);
+    //pin.write(1);
 
     return 0;
 }
