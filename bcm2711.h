@@ -1,12 +1,10 @@
 #pragma once
 #include <cstdint>
-#include <stdexcept>
-#include <fcntl.h>
-#include <sys/mman.h>
-#include <unistd.h>
 
-// BCM2711 documentation:
-// https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2711/rpi_DATA_2711_1p0.pdf
+/*
+	BCM2711 documentation:
+	https://www.raspberrypi.org/documentation/hardware/raspberrypi/bcm2711/rpi_DATA_2711_1p0.pdf
+*/
 
 namespace rpi4b
 {
@@ -19,7 +17,7 @@ namespace rpi4b
 	constexpr uint32_t GPFSEL5	{ 0x14U / sizeof(uint32_t) };	// GPIO function select 5
 
 	// Values for GPFSEL registers
-	enum class function_select
+	enum class fsel
 	{
 		gpio_pin_as_input				= 0b000U,
 		gpio_pin_as_output				= 0b001U,
@@ -78,48 +76,10 @@ namespace rpi4b
 	constexpr uint32_t GPIO_PUP_PDN_CNTRL_REG3	{ 0xF0U / sizeof(uint32_t) };	// GPIO pull-up/pull-down register 3
 
 	// Values for GPFSEL registers
-	enum class pull_selection
+	enum class pull_type
 	{
 		no_pull		= 0b00U,
 		pull_up		= 0b01U,
 		pull_down	= 0b10U
 	};
-
-	class __get_reg_ptr
-	{
-		static volatile uint32_t* GPIO_REGISTER_BASE_MAPPED;
-
-		static volatile uint32_t* MapMemoryAddressSpace()
-		{
-			int gpiomem = open("/dev/gpiomem", O_RDWR | O_SYNC);
-
-			if (gpiomem < 0) 
-			{
-				throw std::runtime_error("Unable to open /dev/gpiomem.");
-			}
-
-			volatile void* mapResult = mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, gpiomem, 0);
-			close(gpiomem);
-
-			if (mapResult == MAP_FAILED) 
-			{
-				throw std::runtime_error("Unable to map memory.");
-			}
-			else 
-			{
-				return reinterpret_cast<volatile uint32_t*>(mapResult);
-			}
-		}
-
-	public:
-
-		volatile uint32_t* operator()(uint32_t reg_offset) const noexcept
-		{
-			return GPIO_REGISTER_BASE_MAPPED + reg_offset;
-		}
-	};
-
-	inline volatile uint32_t* __get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __get_reg_ptr::MapMemoryAddressSpace() };
-
-	constexpr __get_reg_ptr get_reg_ptr;
 }

@@ -1,4 +1,10 @@
 #pragma once
+
+/*
+	__gpio_output struct holds fields unique for gpio class input
+	template type specialization.
+*/
+
 namespace rpi4b
 {
 	template<typename _Reg>

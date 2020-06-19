@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <functional>
+#include <atomic>
 
 namespace rpi4b
 {
@@ -14,7 +15,7 @@ namespace rpi4b
 		std::thread dispatch_thread;
 		std::mutex queue_access_mtx;
 		std::condition_variable queue_empty_cond;
-		bool dispatch_thread_exit;
+		std::atomic<bool> dispatch_thread_exit;
 
 		void run();
 
@@ -29,7 +30,7 @@ namespace rpi4b
 	template<typename _Fun>
 	void dispatch_queue<_Fun>::run()
 	{
-		while (dispatch_thread_exit)
+		while (!dispatch_thread_exit)
 		{
 			// No functions to call so go to sleep
 			if (function_queue.empty())
@@ -51,7 +52,7 @@ namespace rpi4b
 	}
 
 	template<typename _Fun>
-	dispatch_queue<_Fun>::dispatch_queue() : dispatch_thread_exit{ true }
+	dispatch_queue<_Fun>::dispatch_queue() : dispatch_thread_exit{ false }
 	{
 		dispatch_thread = std::thread(std::bind(&dispatch_queue::run, this));
 	}
@@ -59,7 +60,7 @@ namespace rpi4b
 	template<typename _Fun>
 	dispatch_queue<_Fun>::~dispatch_queue()
 	{
-		dispatch_thread_exit = false;
+		dispatch_thread_exit = true;
 		queue_empty_cond.notify_one();
 
 		if (dispatch_thread.joinable())
