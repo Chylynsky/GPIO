@@ -15,7 +15,7 @@ namespace rpi4b
 		std::thread dispatch_thread;
 		std::mutex queue_access_mtx;
 		std::condition_variable queue_empty_cond;
-		std::atomic<bool> dispatch_thread_exit;
+		bool dispatch_thread_exit;
 
 		void run();
 
@@ -24,7 +24,7 @@ namespace rpi4b
 		dispatch_queue();
 		~dispatch_queue();
 
-		void push(_Fun fun);
+		void push(const _Fun& fun);
 	};
 
 	template<typename _Fun>
@@ -32,22 +32,16 @@ namespace rpi4b
 	{
 		while (!dispatch_thread_exit)
 		{
-			// No functions to call so go to sleep
-			if (function_queue.empty())
+			std::unique_lock<std::mutex> lock(queue_access_mtx);
+
+			while (!function_queue.empty())
 			{
-				std::unique_lock<std::mutex> lock(queue_access_mtx);
-				queue_empty_cond.wait(lock, [this] { return (!function_queue.empty() || !dispatch_thread_exit); });
+				_Fun fun = function_queue.front();
+				fun();
+				function_queue.pop();
 			}
-			else
-			{
-				while (!function_queue.empty())
-				{
-					std::unique_lock<std::mutex> lock(queue_access_mtx);
-					_Fun fun = function_queue.front();
-					fun();
-					function_queue.pop();
-				}
-			}
+
+			queue_empty_cond.wait(lock, [this] { return (!function_queue.empty() || dispatch_thread_exit); });
 		}
 	}
 
@@ -60,7 +54,10 @@ namespace rpi4b
 	template<typename _Fun>
 	dispatch_queue<_Fun>::~dispatch_queue()
 	{
-		dispatch_thread_exit = true;
+		{
+			std::unique_lock<std::mutex> lock(queue_access_mtx);
+			dispatch_thread_exit = true;
+		}
 		queue_empty_cond.notify_one();
 
 		if (dispatch_thread.joinable())
@@ -70,7 +67,7 @@ namespace rpi4b
 	}
 
 	template<typename _Fun>
-	void dispatch_queue<_Fun>::push(_Fun fun)
+	void dispatch_queue<_Fun>::push(const _Fun& fun)
 	{
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);

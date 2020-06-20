@@ -5,6 +5,7 @@
 #include <functional>
 #include <condition_variable>
 #include <utility>
+
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -20,12 +21,12 @@ namespace rpi4b
 	template<typename _Reg, typename _Fun>
 	class gpio_callback_map
 	{
-		std::multimap<_Reg, callback_t> callback_map;
+		std::multimap<_Reg, _Fun> callback_map; // key - pin_number, value - callback function
 		std::thread event_poll_thread;
 		std::mutex event_poll_mtx;
 		std::condition_variable event_poll_cond;
-		std::atomic<bool> event_poll_thread_exit;
-		dispatch_queue<callback_t> callback_queue;
+		bool event_poll_thread_exit;
+		dispatch_queue<_Fun> callback_queue;
 
 	public:
 
@@ -33,7 +34,8 @@ namespace rpi4b
 		~gpio_callback_map();
 
 		void poll_events();
-		void push(std::pair<_Reg, _Fun>&& key_val);
+		void insert(std::pair<_Reg, _Fun>&& key_value_pair);
+		void erase(_Reg value);
 	};
 
 	template<typename _Reg, typename _Fun>
@@ -45,7 +47,10 @@ namespace rpi4b
 	template<typename _Reg, typename _Fun>
 	inline gpio_callback_map<_Reg, _Fun>::~gpio_callback_map()
 	{
-		event_poll_thread_exit = true;
+		{
+			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			event_poll_thread_exit = true;
+		}
 		event_poll_cond.notify_one();
 
 		if (event_poll_thread.joinable())
@@ -57,37 +62,46 @@ namespace rpi4b
 	template<typename _Reg, typename _Fun>
 	inline void gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
+		const std::string path = "/dev/gpiomem";
 		volatile _Reg* base_event_reg = get_reg_ptr(GPEDS0);
 
 		pollfd mem;
 		
-		mem.fd = open("/dev/gpiomem", O_RDWR | O_SYNC);
+		mem.fd = open(path.c_str(), O_RDONLY);
 		mem.events = POLLIN;
 
 		if (mem.fd < 0)
 		{
-			throw std::runtime_error("Unable to open /dev/gpiomem.");
+			throw std::runtime_error("Unable to open " + path + ".");
 		}
 
 		while (!event_poll_thread_exit)
 		{
+			std::unique_lock<std::mutex> lock(event_poll_mtx);
 			if (callback_map.empty())
 			{
 				// Wait untill callback_map is not empty
-				std::unique_lock<std::mutex> lock(event_poll_mtx);
-				event_poll_cond.wait(lock, [this] { return (!callback_map.empty() || !event_poll_thread_exit); });
+				event_poll_cond.wait(lock, [this] { return (!callback_map.empty() || event_poll_thread_exit); });
 			}
 			else
 			{
-				poll(&mem, 1, -1);
+				lock.unlock();
+				poll(&mem, 1, 250);
+
+				lock.lock();
 				for (const auto& entry : callback_map)
 				{
-					_Reg reg_sel = entry.first / reg_size<_Reg>;
-					_Reg event_occured = (*(base_event_reg + reg_sel) >> entry.first) & static_cast<_Reg>(1U);
+					_Reg pin_no = entry.first;
+					_Reg reg_sel = pin_no / reg_size<_Reg>;
+					_Reg event_occured = (*(base_event_reg + reg_sel) >> pin_no) & static_cast<_Reg>(1);
 
 					if (event_occured)
 					{
-						callback_queue.push(entry.second);
+						// Clear event register
+						*(base_event_reg + reg_sel) |= static_cast<_Reg>(1) << pin_no;
+
+						_Fun callback = entry.second;
+						callback_queue.push(callback);
 					}
 				}
 			}
@@ -97,11 +111,21 @@ namespace rpi4b
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline void gpio_callback_map<_Reg, _Fun>::push(std::pair<_Reg, _Fun>&& key_val)
+	inline void gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
 			callback_map.insert(key_val);
+		} // Release the lock and notify waiting thread
+		event_poll_cond.notify_one();
+	}
+
+	template<typename _Reg, typename _Fun>
+	inline void gpio_callback_map<_Reg, _Fun>::erase(_Reg value)
+	{
+		{
+			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			callback_map.erase(value);
 		} // Release the lock and notify waiting thread
 		event_poll_cond.notify_one();
 	}

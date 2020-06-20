@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <stdexcept>
+
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
@@ -12,9 +13,9 @@ namespace rpi4b
 
 	class __get_reg_ptr
 	{
-		static volatile uint32_t* GPIO_REGISTER_BASE_MAPPED;
+		static volatile reg_t* GPIO_REGISTER_BASE_MAPPED;
 
-		static volatile uint32_t* MapMemoryAddressSpace()
+		static volatile reg_t* MapMemoryAddressSpace()
 		{
 			int gpiomem = open("/dev/gpiomem", O_RDWR | O_SYNC);
 
@@ -23,17 +24,22 @@ namespace rpi4b
 				throw std::runtime_error("Unable to open /dev/gpiomem.");
 			}
 
-			volatile void* mapResult = mmap(nullptr, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, gpiomem, 0);
+			volatile void* mapResult = static_cast<volatile void*>(mmap(
+				NULL, 
+				4096, 
+				PROT_READ | PROT_WRITE, 
+				MAP_SHARED, 
+				gpiomem, 
+				0));
+
 			close(gpiomem);
 
 			if (mapResult == MAP_FAILED)
 			{
 				throw std::runtime_error("Unable to map memory.");
 			}
-			else
-			{
-				return reinterpret_cast<volatile uint32_t*>(mapResult);
-			}
+
+			return reinterpret_cast<volatile uint32_t*>(mapResult);
 		}
 
 	public:

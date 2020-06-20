@@ -3,5 +3,5 @@
 
 namespace rpi4b
 {
-	using callback_t = std::function<void(void)>;
+	using callback_t = std::function<void()>;
 }

@@ -15,4 +15,7 @@ namespace rpi4b
 		static gpio_callback_map<_Reg, callback_t> callback_map;
 		volatile _Reg* lev_reg;
 	};
+
+	template<typename _Reg>
+	gpio_callback_map<_Reg, callback_t> __gpio_input<_Reg>::callback_map;
 }
