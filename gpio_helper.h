@@ -11,6 +11,9 @@ namespace rpi4b
 	template<typename _Reg>
 	constexpr _Reg reg_size = 8 * sizeof(_Reg);
 
+	/*
+		Functor mapping memory
+	*/
 	class __get_reg_ptr
 	{
 		static volatile reg_t* GPIO_REGISTER_BASE_MAPPED;
@@ -52,7 +55,9 @@ namespace rpi4b
 
 	inline volatile uint32_t* __get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __get_reg_ptr::MapMemoryAddressSpace() };
 
-	// Global function object. Returns volatile uint32_t pointer
-	// to the mapped register.
+	/* 
+		Global function object. Returns volatile uint32_t pointer
+		to the mapped register.
+	*/
 	constexpr __get_reg_ptr get_reg_ptr;
 }

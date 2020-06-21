@@ -7,8 +7,10 @@ namespace rpi4b
 {
 	namespace irq
 	{
-		// Each event type has 'value' field representing
-		// the base register used to turn on pin event detection
+		/*
+			Each event type has 'value' field representing
+			the base register used to turn on pin event detection
+		*/
 
 		struct rising_edge
 		{
@@ -42,7 +44,7 @@ namespace rpi4b
 	}
 
 	/*
-		Additional helper predicates fot events
+		Additional helper predicates for events
 	*/
 
 	// Get base event register offset

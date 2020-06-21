@@ -25,6 +25,8 @@ int main()
 	// Call "blink" function when signal is pulled down be the button
 	pinBtn.attach_event_callback<irq::falling_edge>(blink);
 
+	std::cout << "Push the button attached to pin 25 and enjoy the LED ligh up!" << std::endl;
+
 	// Exit ater 60 seconds
 	sleep_for(60s);
     return 0;
