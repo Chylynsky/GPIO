@@ -1,17 +1,18 @@
 ﻿#include <thread>
 #include <chrono>
 #include <iostream>
+#include "gpio_direction.h"
 #include "gpio.h"
 
 using namespace std::chrono_literals;
 using namespace std::this_thread;
-using namespace rpi4b;
+using namespace rpi;
 
 int main()
 {
-	gpio<output> pinLED(26);	// GPIO pin with LED attached
-	gpio<input> pinBtn(25);		// GPIO pin with button attached
-
+	gpio<dir::output> pinLED(26);	// GPIO pin with LED attached
+	gpio<dir::input> pinBtn(25);		// GPIO pin with button attached
+	
 	pinBtn.set_pull(pull_type::pull_up);	// Set pull up to HIGH
 
 	// Create callback function that blinks once

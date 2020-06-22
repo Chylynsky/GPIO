@@ -1,7 +1,8 @@
 #pragma once
 #include <type_traits>
+#include "gpio_direction.h"
 
-namespace rpi4b
+namespace rpi
 {
 	template<bool _Cond, typename _Ty = void>
 	using Enable_if = typename std::enable_if_t<_Cond, _Ty>;
@@ -17,14 +18,6 @@ namespace rpi4b
 
 	template<typename _Ty>
 	constexpr bool Is_integral = std::is_integral_v<_Ty>;
-
-	struct input
-	{
-	};
-
-	struct output
-	{
-	};
 
 	template<typename _Dir>
 	constexpr bool Is_input = Is_same<_Dir, input>;

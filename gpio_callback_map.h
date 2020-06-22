@@ -16,7 +16,7 @@
 #include "gpio_helper.h"
 #include "dispatch_queue.h"
 
-namespace rpi4b
+namespace rpi
 {
 	template<typename _Reg, typename _Fun>
 	class gpio_callback_map
@@ -63,7 +63,7 @@ namespace rpi4b
 	inline void gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
 		const std::string path = "/dev/gpiomem";
-		volatile _Reg* base_event_reg = get_reg_ptr(GPEDS0);
+		volatile _Reg* base_event_reg = get_reg_ptr(addr::GPEDS0);
 
 		pollfd mem;
 		

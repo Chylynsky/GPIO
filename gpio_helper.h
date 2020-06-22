@@ -1,15 +1,65 @@
 #pragma once
 #include <cstdint>
 #include <stdexcept>
+#include <string>
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
 
-namespace rpi4b
+namespace rpi
 {
+	/*
+		Register size in bits.
+	*/
 	template<typename _Reg>
 	constexpr _Reg reg_size = 8 * sizeof(_Reg);
+
+	/*
+		Linux file descriptor RAII wrapper.
+	*/
+	class file_descriptor
+	{
+		const int fd; // File descriptor.
+
+	public:
+
+		// Constructor.
+		file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+		{
+			if (fd < 0)
+			{
+				throw std::runtime_error("Could not open " + path + ".");
+			}
+		}
+
+		// Constructor.
+		file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+		{
+			if (fd < 0)
+			{
+				throw std::runtime_error("Could not open " + path + ".");
+			}
+		}
+
+		// Destructor.
+		~file_descriptor()
+		{
+			close(fd);
+		}
+
+		// Conversion to int.
+		operator int()
+		{
+			return fd;
+		}
+
+		// Get file descriptor.
+		const int get_fd() const noexcept
+		{
+			return fd;
+		}
+	};
 
 	/*
 		Functor mapping memory
@@ -20,22 +70,15 @@ namespace rpi4b
 
 		static volatile reg_t* MapMemoryAddressSpace()
 		{
-			int gpiomem = open("/dev/gpiomem", O_RDWR | O_SYNC);
-
-			if (gpiomem < 0)
-			{
-				throw std::runtime_error("Unable to open /dev/gpiomem.");
-			}
+			file_descriptor fd{ "/dev/gpiomem", O_RDWR | O_SYNC };
 
 			volatile void* mapResult = static_cast<volatile void*>(mmap(
 				NULL, 
 				4096, 
 				PROT_READ | PROT_WRITE, 
 				MAP_SHARED, 
-				gpiomem, 
+				fd, 
 				0));
-
-			close(gpiomem);
 
 			if (mapResult == MAP_FAILED)
 			{

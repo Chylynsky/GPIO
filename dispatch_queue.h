@@ -7,7 +7,7 @@
 #include <atomic>
 #include <iostream>
 
-namespace rpi4b
+namespace rpi
 {
 	template<typename _Fun>
 	class dispatch_queue

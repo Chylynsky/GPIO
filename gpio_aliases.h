@@ -1,7 +1,7 @@
 #pragma once
 #include <functional>
 
-namespace rpi4b
+namespace rpi
 {
 	using callback_t = std::function<void()>;
 }

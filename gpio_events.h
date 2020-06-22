@@ -3,7 +3,7 @@
 #include "bcm2711.h"
 #include "gpio_predicates.h"
 
-namespace rpi4b
+namespace rpi
 {
 	namespace irq
 	{
@@ -14,32 +14,32 @@ namespace rpi4b
 
 		struct rising_edge
 		{
-			static constexpr uint32_t value = GPREN0;
+			static constexpr uint32_t value = addr::GPREN0;
 		};
 
 		struct falling_edge
 		{
-			static constexpr uint32_t value = GPFEN0;
+			static constexpr uint32_t value = addr::GPFEN0;
 		};
 
 		struct pin_high
 		{
-			static constexpr uint32_t value = GPHEN0;
+			static constexpr uint32_t value = addr::GPHEN0;
 		};
 
 		struct pin_low
 		{
-			static constexpr uint32_t value = GPLEN0;
+			static constexpr uint32_t value = addr::GPLEN0;
 		};
 
 		struct async_rising_edge
 		{
-			static constexpr uint32_t value = GPAREN0;
+			static constexpr uint32_t value = addr::GPAREN0;
 		};
 
 		struct async_falling_edge
 		{
-			static constexpr uint32_t value = GPAFEN0;
+			static constexpr uint32_t value = addr::GPAFEN0;
 		};
 	}
 

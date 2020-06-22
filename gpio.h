@@ -19,7 +19,7 @@
 	32 bit registers.
 */
 
-namespace rpi4b
+namespace rpi
 {
 	template<typename _Dir, typename _Reg = reg_t>
 	class gpio : private Select_if<Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
@@ -72,12 +72,12 @@ namespace rpi4b
 		// Each pin function is described by 3 bits
 		switch (pin_number / 10U)
 		{
-		case 0: return get_reg_ptr(GPFSEL0); break;
-		case 1: return get_reg_ptr(GPFSEL1); break;
-		case 2: return get_reg_ptr(GPFSEL2); break;
-		case 3: return get_reg_ptr(GPFSEL3); break;
-		case 4: return get_reg_ptr(GPFSEL4); break;
-		case 5: return get_reg_ptr(GPFSEL5); break;
+		case 0: return get_reg_ptr(addr::GPFSEL0); break;
+		case 1: return get_reg_ptr(addr::GPFSEL1); break;
+		case 2: return get_reg_ptr(addr::GPFSEL2); break;
+		case 3: return get_reg_ptr(addr::GPFSEL3); break;
+		case 4: return get_reg_ptr(addr::GPFSEL4); break;
+		case 5: return get_reg_ptr(addr::GPFSEL5); break;
 		default: throw std::runtime_error("Pin number out of range."); break;
 		}
 	}
@@ -99,7 +99,7 @@ namespace rpi4b
 		// Enable only when instantiated with input template parameter
 		if constexpr (Is_input<_Dir>)
 		{
-			__gpio_input<_Reg>::lev_reg = get_reg_ptr(GPLEV0 + reg_index);
+			__gpio_input<_Reg>::lev_reg = get_reg_ptr(addr::GPLEV0 + reg_index);
 		}
 		
 		// Enable only when instantiated with output template parameter
@@ -108,8 +108,8 @@ namespace rpi4b
 			*fsel_reg |= static_cast<uint32_t>(fsel::gpio_pin_as_output) << fsel_bit_shift;
 
 			// 31 pins are described by the first GPSET and GPCLR registers
-			__gpio_output<_Reg>::set_reg = get_reg_ptr(GPSET0 + reg_index);
-			__gpio_output<_Reg>::clr_reg = get_reg_ptr(GPCLR0 + reg_index);
+			__gpio_output<_Reg>::set_reg = get_reg_ptr(addr::GPSET0 + reg_index);
+			__gpio_output<_Reg>::clr_reg = get_reg_ptr(addr::GPCLR0 + reg_index);
 		}
 	}
 
@@ -123,12 +123,12 @@ namespace rpi4b
 			uint32_t reg_index = pin_number / reg_size<_Reg>;
 
 			// Clear event detect bits
-			*get_reg_ptr(GPREN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(GPFEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(GPHEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(GPLEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(GPAREN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(GPAFEN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPREN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPFEN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPHEN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPLEN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPAREN0 + reg_index)	&= reg_bit_clr_val;
+			*get_reg_ptr(addr::GPAFEN0 + reg_index)	&= reg_bit_clr_val;
 
 			// Set pull-down resistor
 			set_pull(pull_type::pull_down);
@@ -173,7 +173,7 @@ namespace rpi4b
 	inline Enable_if<Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_pull(pull_type pull_sel) noexcept
 	{
 		// 16 pins are controlled by each register
-		volatile _Reg* reg_sel = get_reg_ptr(GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
+		volatile _Reg* reg_sel = get_reg_ptr(addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
 
 		 // Each pin is represented by two bits, 16 pins described by each register
 		_Reg bit_shift = 2U * (pin_number % 16U);
@@ -188,7 +188,7 @@ namespace rpi4b
 	inline Enable_if<Is_input<_Ty>, pull_type> gpio<_Dir, _Reg>::get_pull() noexcept
 	{
 		// 16 pins are controlled by each register
-		volatile _Reg* reg_sel = get_reg_ptr(GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
+		volatile _Reg* reg_sel = get_reg_ptr(addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
 		return static_cast<pull_type>(*reg_sel >> (2U * (pin_number % 16U)) & 0b11U);
 	}
 
