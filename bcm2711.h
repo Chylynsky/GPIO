@@ -67,20 +67,20 @@ namespace rpi
 		constexpr reg_t GPIO_PUP_PDN_CNTRL_REG3{ 0xF0U / sizeof(reg_t) };	// GPIO pull-up/pull-down register 3
 	}
 
-	// Values for GPFSEL registers
+	// Values for GPFSEL registers.
 	enum class fsel
 	{
-		gpio_pin_as_input = 0b000U,
-		gpio_pin_as_output = 0b001U,
-		gpio_pin_alternate_function_0 = 0b100U,
-		gpio_pin_alternate_function_1 = 0b101U,
-		gpio_pin_alternate_function_2 = 0b110U,
-		gpio_pin_alternate_function_3 = 0b111U,
-		gpio_pin_alternate_function_4 = 0b011U,
-		gpio_pin_alternate_function_5 = 0b010U
+		gpio_pin_as_input				= 0b000U,
+		gpio_pin_as_output				= 0b001U,
+		gpio_pin_alternate_function_0	= 0b100U,
+		gpio_pin_alternate_function_1	= 0b101U,
+		gpio_pin_alternate_function_2	= 0b110U,
+		gpio_pin_alternate_function_3	= 0b111U,
+		gpio_pin_alternate_function_4	= 0b011U,
+		gpio_pin_alternate_function_5	= 0b010U
 	};
 
-	// Values for GPFSEL registers
+	// Values for GPFSEL registers.
 	enum class pull_type
 	{
 		none		= 0b00U,

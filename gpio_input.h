@@ -2,7 +2,7 @@
 #include "gpio_aliases.h"
 #include "gpio_callback_map.h"
 
-namespace rpi4b
+namespace rpi
 {
 	/*
 		__gpio_input struct holds fields unique for gpio class input

@@ -20,8 +20,8 @@ namespace rpi
 	constexpr bool Is_integral = std::is_integral_v<_Ty>;
 
 	template<typename _Dir>
-	constexpr bool Is_input = Is_same<_Dir, input>;
+	constexpr bool Is_input = Is_same<_Dir, dir::input>;
 
 	template<typename _Dir>
-	constexpr bool Is_output = Is_same<_Dir, output>;
+	constexpr bool Is_output = Is_same<_Dir, dir::output>;
 }

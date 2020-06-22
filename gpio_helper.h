@@ -13,7 +13,7 @@ namespace rpi
 		Register size in bits.
 	*/
 	template<typename _Reg>
-	constexpr _Reg reg_size = 8 * sizeof(_Reg);
+	constexpr uint32_t reg_size = 8U * sizeof(_Reg);
 
 	/*
 		Linux file descriptor RAII wrapper.
@@ -48,14 +48,13 @@ namespace rpi
 			close(fd);
 		}
 
-		// Conversion to int.
 		operator int()
 		{
 			return fd;
 		}
 
 		// Get file descriptor.
-		const int get_fd() const noexcept
+		int get_fd() const noexcept
 		{
 			return fd;
 		}

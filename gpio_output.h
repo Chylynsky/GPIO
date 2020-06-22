@@ -5,7 +5,7 @@
 	template type specialization.
 */
 
-namespace rpi4b
+namespace rpi
 {
 	template<typename _Reg>
 	struct __gpio_output

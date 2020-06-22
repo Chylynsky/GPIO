@@ -9,22 +9,29 @@
 
 namespace rpi
 {
+	/*
+		Template class responsible for queued callback 
+		execution on a seperate thread.
+	*/
 	template<typename _Fun>
 	class dispatch_queue
 	{
-		std::queue<_Fun> function_queue;
-		std::thread dispatch_thread;
-		std::mutex queue_access_mtx;
-		std::condition_variable queue_empty_cond;
-		bool dispatch_thread_exit;
+		std::queue<_Fun> function_queue;			// Queue with functions to be executed.
+		std::thread dispatch_thread;				// Thread on which the functions are executed.
+		std::mutex queue_access_mtx;				// Mutex for resource access control.
+		std::condition_variable queue_empty_cond;	// Puts the thread to sleep when no functions are in the queue.
+		volatile bool dispatch_thread_exit;			// Thread loop control.
 
+		// Method executes queued callback functions.
 		void run();
 
 	public:
 
+		// Constructor.
 		dispatch_queue();
+		// Destructor.
 		~dispatch_queue();
-
+		// Push the function to the end of the queue.
 		void push(const _Fun& fun);
 	};
 
@@ -35,6 +42,7 @@ namespace rpi
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);
 
+			// Execute all functions
 			while (!function_queue.empty())
 			{
 				_Fun fun = function_queue.front();
@@ -58,9 +66,10 @@ namespace rpi
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);
 			dispatch_thread_exit = true;
-		}
+		} // Release the mutex and notify wating thread.
 		queue_empty_cond.notify_one();
 
+		// Wait for the thread to exit.
 		if (dispatch_thread.joinable())
 		{
 			dispatch_thread.join();
@@ -73,7 +82,7 @@ namespace rpi
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);
 			function_queue.push(fun);
-		}
+		} // Release the mutex and notify wating thread.
 		queue_empty_cond.notify_one();
 	}
 }
