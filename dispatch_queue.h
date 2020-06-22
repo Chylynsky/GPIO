@@ -46,10 +46,15 @@ namespace rpi
 			while (!function_queue.empty())
 			{
 				_Fun fun = function_queue.front();
-				fun();
+				
+				lock.unlock();	// Unlock the mutex while the callback is being executed.
+				fun();			// Execute the callback function.
+				lock.lock();	// Lock again.
+
 				function_queue.pop();
 			}
 
+			// Wait until queue is not empty or destructor is called.
 			queue_empty_cond.wait(lock, [this] { return (!function_queue.empty() || dispatch_thread_exit); });
 		}
 	}

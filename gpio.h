@@ -2,7 +2,6 @@
 #include <cstdint>
 #include <stdexcept>
 #include <utility>
-#include <cassert>
 #include <iostream>
 
 #include "gpio_predicates.h"
