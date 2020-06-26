@@ -3,7 +3,6 @@
 #include <iostream>
 
 #define BCM2711
-#include "gpio_direction.h"
 #include "gpio.h"
 
 using namespace rpi;

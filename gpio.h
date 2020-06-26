@@ -4,6 +4,7 @@
 #include <utility>
 #include <iostream>
 
+#include "gpio_direction.h"
 #include "gpio_predicates.h"
 #include "gpio_events.h"
 #include "gpio_input.h"
@@ -13,6 +14,8 @@
 
 #if defined(BCM2711)
 #include "bcm2711.h"
+#else
+static_assert(0, "Processor model must be specified as macro definition before including gpio.h")
 #endif
 
 namespace rpi

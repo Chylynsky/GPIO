@@ -42,6 +42,8 @@ namespace rpi
 			}
 		}
 
+		file_descriptor(int fd) : fd{ fd } {};
+
 		// Destructor.
 		~file_descriptor()
 		{

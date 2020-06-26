@@ -79,7 +79,9 @@ namespace rpi
 	inline void gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
 		volatile _Reg* base_event_reg = get_reg_ptr(addr::GPEDS0);
-		file_descriptor fd{ "/dev/gpiomem", O_RDONLY };
+		file_descriptor fd{ memfd_create("irq", 0) };
+
+		write(fd, (void*)base_event_reg, 2 * sizeof(_Reg));
 
 		pollfd mem;
 		mem.fd = fd.get_fd();
