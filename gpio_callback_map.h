@@ -21,6 +21,7 @@
 
 namespace rpi
 {
+	constexpr int POLL_TIMEOUT{ 200 }; // ms
 	/*
 		Template class holding key - value pairs where key is the GPIO pin number
 		and value is the callback function which gets executed when specified event
@@ -35,8 +36,8 @@ namespace rpi
 		std::thread event_poll_thread;				// Thread on which events are polled.
 		std::mutex event_poll_mtx;					// Mutex for resource access control.
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.
-		volatile bool event_poll_thread_exit;		// Loop control for event_poll_thread.
-		dispatch_queue<_Fun> callback_queue;		// When the event occurs, corresponding callback function is pushed here.
+		std::atomic<bool> event_poll_thread_exit;	// Loop control for event_poll_thread.
+		dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding callback function is pushed here.
 
 	public:
 
@@ -81,7 +82,7 @@ namespace rpi
 		volatile _Reg* base_event_reg = get_reg_ptr(addr::GPEDS0);
 		file_descriptor fd{ memfd_create("irq", 0) };
 
-		write(fd, (void*)base_event_reg, 2 * sizeof(_Reg));
+		write(fd, static_cast<void*>(base_event_reg), 2 * sizeof(_Reg));
 
 		pollfd mem;
 		mem.fd = fd.get_fd();
@@ -98,7 +99,7 @@ namespace rpi
 			else
 			{
 				lock.unlock();	// Poll is blocking so release the mutex.
-				poll(&mem, 1, 250);
+				poll(&mem, 1, POLL_TIMEOUT);
 
 				lock.lock();
 				for (const std::pair<_Reg, _Fun>& entry : callback_map)

@@ -22,7 +22,7 @@ namespace rpi
 {
 	/*
 		Template class gpio allows access to gpio with direction
-		specified by the template type _Dir.
+		specified by the template type _Dir and register type _Reg.
 	*/
 	template<typename _Dir, typename _Reg = reg_t>
 	class gpio : private Select_if<Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>

@@ -20,7 +20,7 @@ namespace rpi
 		std::thread dispatch_thread;				// Thread on which the functions are executed.
 		std::mutex queue_access_mtx;				// Mutex for resource access control.
 		std::condition_variable queue_empty_cond;	// Puts the thread to sleep when no functions are in the queue.
-		volatile bool dispatch_thread_exit;			// Thread loop control.
+		std::atomic<bool> dispatch_thread_exit;		// Thread loop control.
 
 		// Method executes queued callback functions.
 		void run();
