@@ -14,7 +14,7 @@ namespace rpi
 		execution on a seperate thread.
 	*/
 	template<typename _Fun>
-	class dispatch_queue
+	class __dispatch_queue
 	{
 		std::queue<_Fun> function_queue;			// Queue with functions to be executed.
 		std::thread dispatch_thread;				// Thread on which the functions are executed.
@@ -28,15 +28,15 @@ namespace rpi
 	public:
 
 		// Constructor.
-		dispatch_queue();
+		__dispatch_queue();
 		// Destructor.
-		~dispatch_queue();
+		~__dispatch_queue();
 		// Push the function to the end of the queue.
 		void push(const _Fun& fun);
 	};
 
 	template<typename _Fun>
-	void dispatch_queue<_Fun>::run()
+	void __dispatch_queue<_Fun>::run()
 	{
 		while (!dispatch_thread_exit)
 		{
@@ -60,13 +60,13 @@ namespace rpi
 	}
 
 	template<typename _Fun>
-	dispatch_queue<_Fun>::dispatch_queue() : dispatch_thread_exit{ false }
+	__dispatch_queue<_Fun>::__dispatch_queue() : dispatch_thread_exit{ false }
 	{
-		dispatch_thread = std::thread(std::bind(&dispatch_queue::run, this));
+		dispatch_thread = std::thread(std::bind(&__dispatch_queue::run, this));
 	}
 
 	template<typename _Fun>
-	dispatch_queue<_Fun>::~dispatch_queue()
+	__dispatch_queue<_Fun>::~__dispatch_queue()
 	{
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);
@@ -82,7 +82,7 @@ namespace rpi
 	}
 
 	template<typename _Fun>
-	void dispatch_queue<_Fun>::push(const _Fun& fun)
+	void __dispatch_queue<_Fun>::push(const _Fun& fun)
 	{
 		{
 			std::unique_lock<std::mutex> lock(queue_access_mtx);

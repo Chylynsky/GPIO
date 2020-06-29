@@ -12,10 +12,10 @@ namespace rpi
 	template<typename _Reg>
 	struct __gpio_input
 	{
-		static gpio_callback_map<_Reg, callback_t> callback_map;
+		static __gpio_callback_map<_Reg, callback_t> callback_map;
 		volatile _Reg* lev_reg;
 	};
 
 	template<typename _Reg>
-	gpio_callback_map<_Reg, callback_t> __gpio_input<_Reg>::callback_map;
+	__gpio_callback_map<_Reg, callback_t> __gpio_input<_Reg>::callback_map;
 }

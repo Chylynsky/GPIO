@@ -15,7 +15,7 @@
 #if defined(BCM2711)
 #include "bcm2711.h"
 #else
-static_assert(0, "Processor model must be specified as macro definition before including gpio.h")
+static_assert(0, "Processor model must be specified as a macro definition before including gpio.h.")
 #endif
 
 namespace rpi
@@ -25,10 +25,10 @@ namespace rpi
 		specified by the template type _Dir and register type _Reg.
 	*/
 	template<typename _Dir, typename _Reg = reg_t>
-	class gpio : private Select_if<Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
+	class gpio : private __Select_if<__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
 	{
-		static_assert(Is_input<_Dir> || Is_output<_Dir>, "Template type _Dir must be either input or output.");
-		static_assert(Is_integral<_Reg>, "Template type _Reg must be integral.");
+		static_assert(__Is_direction<_Dir>, "Template type _Dir must be either dir::input or dir::output.");
+		static_assert(__Is_integral<_Reg>, "Template type _Reg must be integral.");
 
 		// Select FSEL register offset based on GPIO pin number.
 		volatile _Reg* get_fsel_reg();
@@ -41,47 +41,57 @@ namespace rpi
 		explicit gpio(uint32_t pin_number);
 		~gpio();
 
-		gpio() = delete;
-		gpio(const gpio&) = delete;
-		gpio& operator=(const gpio&) = delete;
-
 		// Output methods
+
+		template<typename _Arg = int, typename _Ty = _Dir>
+		__Enable_if<__Is_output<_Ty>, void> operator=(_Arg state) noexcept;
 
 		// Write to GPIO pin
 		template<typename _Arg = int, typename _Ty = _Dir>
-		Enable_if<Is_output<_Ty>, void> write(_Arg state) noexcept;
+		__Enable_if<__Is_output<_Ty>, void> write(_Arg state) noexcept;
 
 		// Input methods.
 
 		// Read current GPIO pin state.
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, uint32_t> read() const noexcept;
+		__Enable_if<__Is_input<_Ty>, uint32_t> read() const noexcept;
 
 		// Set pull-up, pull-down or none.
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, void> set_pull(pull_type pull_sel) noexcept;
+		__Enable_if<__Is_input<_Ty>, void> set_pull(pull pull_sel) noexcept;
 
 		// Get current pull type.
 		template<typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty>, pull_type> get_pull() noexcept;
+		__Enable_if<__Is_input<_Ty>, pull> get_pull() noexcept;
 
 		// Set event callback.
 		template<typename _Ev, typename _Ty = _Dir>
-		Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> attach_event_callback(callback_t) noexcept;
+		__Enable_if<__Is_input<_Ty> && __Is_event<_Ev>, void> attach_event_callback(callback_t callback) noexcept;
+
+		// Deleted methods.
+
+		gpio() = delete;
+		gpio(const gpio&) = delete;
+		gpio(gpio&&) = delete;
+		gpio& operator=(const gpio&) = delete;
+		gpio& operator=(gpio&&) = delete;
 	};
 
 	template<typename _Dir, typename _Reg>
 	inline volatile _Reg* gpio<_Dir, _Reg>::get_fsel_reg()
 	{
-		// Each pin function is described by 3 bits.
+		/* 
+			Each pin function is described by 3 bits,
+			each register controls 10 pins
+		*/
 		switch (pin_number / 10U)
 		{
-		case 0: return get_reg_ptr(addr::GPFSEL0); break;
-		case 1: return get_reg_ptr(addr::GPFSEL1); break;
-		case 2: return get_reg_ptr(addr::GPFSEL2); break;
-		case 3: return get_reg_ptr(addr::GPFSEL3); break;
-		case 4: return get_reg_ptr(addr::GPFSEL4); break;
-		case 5: return get_reg_ptr(addr::GPFSEL5); break;
+		case 0: return __get_reg_ptr(__addr::GPFSEL0); break;
+		case 1: return __get_reg_ptr(__addr::GPFSEL1); break;
+		case 2: return __get_reg_ptr(__addr::GPFSEL2); break;
+		case 3: return __get_reg_ptr(__addr::GPFSEL3); break;
+		case 4: return __get_reg_ptr(__addr::GPFSEL4); break;
+		case 5: return __get_reg_ptr(__addr::GPFSEL5); break;
 		default: throw std::runtime_error("Pin number out of range."); break;
 		}
 	}
@@ -101,20 +111,20 @@ namespace rpi
 		uint32_t reg_index = pin_number / reg_size<_Reg>;
 
 		// Enable only when instantiated with input template parameter.
-		if constexpr (Is_input<_Dir>)
+		if constexpr (__Is_input<_Dir>)
 		{
-			*fsel_reg |= static_cast<uint32_t>(fsel::gpio_pin_as_input) << fsel_bit_shift;
-			__gpio_input<_Reg>::lev_reg = get_reg_ptr(addr::GPLEV0 + reg_index);
+			*fsel_reg |= static_cast<uint32_t>(__function_select::gpio_pin_as_input) << fsel_bit_shift;
+			__gpio_input<_Reg>::lev_reg = __get_reg_ptr(__addr::GPLEV0 + reg_index);
 		}
 		
 		// Enable only when instantiated with output template parameter.
-		if constexpr (Is_output<_Dir>)
+		if constexpr (__Is_output<_Dir>)
 		{
-			*fsel_reg |= static_cast<uint32_t>(fsel::gpio_pin_as_output) << fsel_bit_shift;
+			*fsel_reg |= static_cast<uint32_t>(__function_select::gpio_pin_as_output) << fsel_bit_shift;
 
 			// 31 pins are described by the first GPSET and GPCLR registers.
-			__gpio_output<_Reg>::set_reg = get_reg_ptr(addr::GPSET0 + reg_index);
-			__gpio_output<_Reg>::clr_reg = get_reg_ptr(addr::GPCLR0 + reg_index);
+			__gpio_output<_Reg>::set_reg = __get_reg_ptr(__addr::GPSET0 + reg_index);
+			__gpio_output<_Reg>::clr_reg = __get_reg_ptr(__addr::GPCLR0 + reg_index);
 		}
 	}
 
@@ -122,27 +132,27 @@ namespace rpi
 	inline gpio<_Dir, _Reg>::~gpio()
 	{
 		// Enable only when instantiated with input template parameter.
-		if constexpr (Is_input<_Dir>)
+		if constexpr (__Is_input<_Dir>)
 		{
 			_Reg reg_bit_clr_val = ~reg_bit_set_val;
 			uint32_t reg_index = pin_number / reg_size<_Reg>;
 
 			// Clear event detect bits.
-			*get_reg_ptr(addr::GPREN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(addr::GPFEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(addr::GPHEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(addr::GPLEN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(addr::GPAREN0 + reg_index)	&= reg_bit_clr_val;
-			*get_reg_ptr(addr::GPAFEN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPREN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPFEN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPHEN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPLEN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPAREN0 + reg_index)	&= reg_bit_clr_val;
+			*__get_reg_ptr(__addr::GPAFEN0 + reg_index)	&= reg_bit_clr_val;
 
 			// Set pull-down resistor.
-			set_pull(pull_type::pull_down);
+			set_pull(pull::down);
 
 			__gpio_input<_Reg>::callback_map.erase(pin_number);
 		}
 
 		// Enable only when instantiated with output template parameter.
-		if constexpr (Is_output<_Dir>)
+		if constexpr (__Is_output<_Dir>)
 		{
 			*__gpio_output<_Reg>::clr_reg |= reg_bit_set_val;
 		}
@@ -153,9 +163,16 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Arg, typename _Ty>
-	inline Enable_if<Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
+	inline __Enable_if<__Is_output<_Ty>, void> gpio<_Dir, _Reg>::operator=(_Arg state) noexcept
 	{
-		static_assert(Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
+		write(state);
+	}
+
+	template<typename _Dir, typename _Reg>
+	template<typename _Arg, typename _Ty>
+	inline __Enable_if<__Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
+	{
+		static_assert(__Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
 
 		// Set '1' in SET or CLR register.
 		if (!state)
@@ -170,17 +187,17 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, uint32_t> gpio<_Dir, _Reg>::read() const noexcept
+	inline __Enable_if<__Is_input<_Ty>, uint32_t> gpio<_Dir, _Reg>::read() const noexcept
 	{
 		return (*__gpio_input<_Reg>::lev_reg >> (pin_number % reg_size<_Reg>)) & 1U;
 	}
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_pull(pull_type pull_sel) noexcept
+	inline __Enable_if<__Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_pull(pull pull_sel) noexcept
 	{
 		// 16 pins are controlled by each register.
-		volatile _Reg* reg_sel = get_reg_ptr(addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
+		volatile _Reg* reg_sel = __get_reg_ptr(__addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
 
 		 // Each pin is represented by two bits, 16 pins described by each register.
 		_Reg bit_shift = 2U * (pin_number % 16U);
@@ -192,19 +209,19 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline Enable_if<Is_input<_Ty>, pull_type> gpio<_Dir, _Reg>::get_pull() noexcept
+	inline __Enable_if<__Is_input<_Ty>, pull> gpio<_Dir, _Reg>::get_pull() noexcept
 	{
 		// 16 pins are controlled by each register.
-		volatile _Reg* reg_sel = get_reg_ptr(addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
-		return static_cast<pull_type>(*reg_sel >> (2U * (pin_number % 16U)) & 0b11U);
+		volatile _Reg* reg_sel = __get_reg_ptr(__addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
+		return static_cast<pull>(*reg_sel >> (2U * (pin_number % 16U)) & 0b11U);
 	}
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ev, typename _Ty>
-	inline Enable_if<Is_input<_Ty> && Is_event<_Ev>, void> gpio<_Dir, _Reg>::attach_event_callback(callback_t callback) noexcept
+	inline __Enable_if<__Is_input<_Ty> && __Is_event<_Ev>, void> gpio<_Dir, _Reg>::attach_event_callback(callback_t callback) noexcept
 	{
 		// Get event register based on event type.
-		volatile _Reg* event_reg = get_reg_ptr(Event_reg_offs<_Ev> + pin_number / reg_size<_Reg>);
+		volatile _Reg* event_reg = __get_reg_ptr(__Event_reg_offs<_Ev> + pin_number / reg_size<_Reg>);
 
 		// Clear then set bit responsible for the selected pin.
 		*event_reg &= ~reg_bit_set_val;

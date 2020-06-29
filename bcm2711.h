@@ -10,7 +10,7 @@ namespace rpi
 {
 	using reg_t = uint32_t;
 
-	namespace addr
+	namespace __addr
 	{
 		// GPIO function select offsets
 		constexpr reg_t GPFSEL0{ 0x00U / sizeof(reg_t) };	// GPIO function select 0
@@ -68,7 +68,7 @@ namespace rpi
 	}
 
 	// Values for GPFSEL registers.
-	enum class fsel
+	enum class __function_select
 	{
 		gpio_pin_as_input				= 0b000U,
 		gpio_pin_as_output				= 0b001U,
@@ -81,10 +81,10 @@ namespace rpi
 	};
 
 	// Values for GPFSEL registers.
-	enum class pull_type
+	enum class pull
 	{
-		none		= 0b00U,
-		pull_up		= 0b01U,
-		pull_down	= 0b10U
+		none	= 0b00U,
+		up		= 0b01U,
+		down	= 0b10U
 	};
 }

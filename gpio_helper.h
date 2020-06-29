@@ -18,14 +18,14 @@ namespace rpi
 	/*
 		Linux file descriptor RAII wrapper.
 	*/
-	class file_descriptor
+	class __file_descriptor
 	{
 		const int fd; // File descriptor.
 
 	public:
 
 		// Constructor.
-		file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+		explicit __file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
 			if (fd < 0)
 			{
@@ -34,7 +34,7 @@ namespace rpi
 		}
 
 		// Constructor.
-		file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+		explicit __file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
 			if (fd < 0)
 			{
@@ -42,10 +42,13 @@ namespace rpi
 			}
 		}
 
-		file_descriptor(int fd) : fd{ fd } {};
+		// Constructor
+		explicit __file_descriptor(int fd) : fd{ fd } 
+		{
+		};
 
 		// Destructor.
-		~file_descriptor()
+		~__file_descriptor()
 		{
 			close(fd);
 		}
@@ -60,18 +63,22 @@ namespace rpi
 		{
 			return fd;
 		}
+
+		__file_descriptor() = delete;
+		__file_descriptor& operator=(const __file_descriptor&) = delete;
+		__file_descriptor& operator=(__file_descriptor&&) = delete;
 	};
 
 	/*
 		Functor mapping memory
 	*/
-	class __get_reg_ptr
+	class __Get_reg_ptr
 	{
 		static volatile reg_t* GPIO_REGISTER_BASE_MAPPED;
 
 		static volatile reg_t* MapMemoryAddressSpace()
 		{
-			file_descriptor fd{ "/dev/gpiomem", O_RDWR | O_SYNC };
+			__file_descriptor fd{ "/dev/gpiomem", O_RDWR | O_SYNC };
 
 			volatile void* mapResult = static_cast<volatile void*>(mmap(
 				NULL, 
@@ -97,11 +104,11 @@ namespace rpi
 		}
 	};
 
-	inline volatile uint32_t* __get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __get_reg_ptr::MapMemoryAddressSpace() };
+	inline volatile uint32_t* __Get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
 
 	/* 
 		Global function object. Returns volatile uint32_t pointer
 		to the mapped register.
 	*/
-	constexpr __get_reg_ptr get_reg_ptr;
+	static __Get_reg_ptr __get_reg_ptr;
 }

@@ -10,27 +10,29 @@ using namespace std;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
 
-constexpr uint32_t LED_PIN_NUMBER{ 26 };
-constexpr uint32_t BTN_PIN_NUMBER{ 25 };
-
 int main()
 {
+	constexpr uint32_t LED_PIN_NUMBER{ 26 };
+	constexpr uint32_t BTN_PIN_NUMBER{ 25 };
+
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
 	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
 	
-	pinBtn.set_pull(pull_type::pull_up);		// Set pull up to HIGH
-
-	// Create callback function that blinks twice
+	pinBtn.set_pull(pull::up);	// Set pull up resistor
+	// Create callback lambda that makes an LED blink twice
 	auto blink = [&pinLED]
 	{
-		cout << "Blink!" << endl;
+		// First blink uses assignment operator
+		pinLED = 1;
+		sleep_for(100ms);
+		pinLED = 0;
+		sleep_for(100ms);
+
+		// Second blink uses write function
 		pinLED.write(1);
-		sleep_for(200ms);
+		sleep_for(100ms);
 		pinLED.write(0);
-		sleep_for(200ms);
-		pinLED.write(1);
-		sleep_for(200ms);
-		pinLED.write(0);
+		sleep_for(100ms);
 	};
 
 	// Call "blink" function when signal is pulled down by the button

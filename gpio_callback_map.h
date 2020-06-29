@@ -5,6 +5,7 @@
 #include <functional>
 #include <condition_variable>
 #include <utility>
+#include <iostream>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -21,30 +22,30 @@
 
 namespace rpi
 {
-	constexpr int POLL_TIMEOUT{ 200 }; // ms
 	/*
 		Template class holding key - value pairs where key is the GPIO pin number
 		and value is the callback function which gets executed when specified event
-		occures.
+		occures. Its main task is to control whether an event has occured and if so,
+		to pass it into dispatch queue.
 	*/
 	template<typename _Reg, typename _Fun>
-	class gpio_callback_map
+	class __gpio_callback_map
 	{
-		static_assert(Is_integral<_Reg>, "_Reg must be of integral type.");
+		static_assert(__Is_integral<_Reg>, "_Reg must be of integral type.");
 
 		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function
 		std::thread event_poll_thread;				// Thread on which events are polled.
 		std::mutex event_poll_mtx;					// Mutex for resource access control.
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.
 		std::atomic<bool> event_poll_thread_exit;	// Loop control for event_poll_thread.
-		dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding callback function is pushed here.
+		__dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding callback function is pushed here.
 
 	public:
 
 		// Constructor.
-		gpio_callback_map();
+		__gpio_callback_map();
 		// Destructor.
-		~gpio_callback_map();
+		~__gpio_callback_map();
 
 		// Main event_poll_thread function.
 		void poll_events();
@@ -55,13 +56,13 @@ namespace rpi
 	};
 
 	template<typename _Reg, typename _Fun>
-	inline gpio_callback_map<_Reg, _Fun>::gpio_callback_map() : event_poll_thread_exit{ false }
+	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
 	{
-		event_poll_thread = std::thread(std::bind(&gpio_callback_map<_Reg, _Fun>::poll_events, this));
+		event_poll_thread = std::thread(std::bind(&__gpio_callback_map<_Reg, _Fun>::poll_events, this));
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline gpio_callback_map<_Reg, _Fun>::~gpio_callback_map()
+	inline __gpio_callback_map<_Reg, _Fun>::~__gpio_callback_map()
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
@@ -77,16 +78,9 @@ namespace rpi
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline void gpio_callback_map<_Reg, _Fun>::poll_events()
+	inline void __gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
-		volatile _Reg* base_event_reg = get_reg_ptr(addr::GPEDS0);
-		file_descriptor fd{ memfd_create("irq", 0) };
-
-		write(fd, static_cast<void*>(base_event_reg), 2 * sizeof(_Reg));
-
-		pollfd mem;
-		mem.fd = fd.get_fd();
-		mem.events = POLLIN;
+		volatile _Reg* base_event_reg = __get_reg_ptr(__addr::GPEDS0);
 
 		while (!event_poll_thread_exit)
 		{
@@ -98,10 +92,6 @@ namespace rpi
 			}
 			else
 			{
-				lock.unlock();	// Poll is blocking so release the mutex.
-				poll(&mem, 1, POLL_TIMEOUT);
-
-				lock.lock();
 				for (const std::pair<_Reg, _Fun>& entry : callback_map)
 				{
 					_Reg pin_no = entry.first;
@@ -112,9 +102,7 @@ namespace rpi
 					{
 						// Clear event register.
 						*(base_event_reg + reg_sel) |= 1U << pin_no;
-
-						_Fun callback = entry.second;
-						callback_queue.push(callback);
+						callback_queue.push(entry.second);
 					}
 				}
 			}
@@ -122,7 +110,7 @@ namespace rpi
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline void gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
+	inline void __gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
@@ -132,7 +120,7 @@ namespace rpi
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline void gpio_callback_map<_Reg, _Fun>::erase(_Reg key)
+	inline void __gpio_callback_map<_Reg, _Fun>::erase(_Reg key)
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
