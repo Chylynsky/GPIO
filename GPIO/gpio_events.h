@@ -55,11 +55,11 @@ namespace rpi
 
 	// Get base event register offs.
 	template<typename _Ev>
-	constexpr uint32_t __Event_reg_offs = _Ev::offs;
+	inline constexpr uint32_t __Event_reg_offs = _Ev::offs;
 
 	// Check if the specified type is an event.
 	template<typename _Ty>
-	constexpr bool __Is_event = 
+	inline constexpr bool __Is_event = 
 		__Is_same<_Ty, irq::rising_edge>			||
 		__Is_same<_Ty, irq::falling_edge>			||
 		__Is_same<_Ty, irq::pin_high>				||

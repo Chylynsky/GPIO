@@ -5,7 +5,6 @@
 #include <functional>
 #include <condition_variable>
 #include <utility>
-#include <iostream>
 
 #include <fcntl.h>
 #include <sys/mman.h>

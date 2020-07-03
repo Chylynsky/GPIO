@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <string>
+#include <iostream>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -13,7 +14,7 @@ namespace rpi
 		Register size in bits.
 	*/
 	template<typename _Reg>
-	constexpr uint32_t reg_size = 8U * sizeof(_Reg);
+	inline constexpr uint32_t reg_size = 8U * sizeof(_Reg);
 
 	/*
 		Linux file descriptor RAII wrapper.
@@ -53,6 +54,7 @@ namespace rpi
 			close(fd);
 		}
 
+		// Implicit conversion to int.
 		operator int()
 		{
 			return fd;
@@ -64,29 +66,33 @@ namespace rpi
 			return fd;
 		}
 
+		/*
+			Deleted functions.
+		*/
 		__file_descriptor() = delete;
 		__file_descriptor& operator=(const __file_descriptor&) = delete;
 		__file_descriptor& operator=(__file_descriptor&&) = delete;
 	};
 
 	/*
-		Functor mapping memory
+		Functor used to map memory and access it easily.
 	*/
 	class __Get_reg_ptr
 	{
-		static volatile reg_t* GPIO_REGISTER_BASE_MAPPED;
+		static volatile uint32_t* GPIO_REGISTER_BASE_MAPPED;
 
-		static volatile reg_t* MapMemoryAddressSpace()
+		static volatile uint32_t* MapMemoryAddressSpace()
 		{
 			__file_descriptor fd{ "/dev/gpiomem", O_RDWR | O_SYNC };
 
-			volatile void* mapResult = static_cast<volatile void*>(mmap(
-				NULL, 
-				4096, 
-				PROT_READ | PROT_WRITE, 
-				MAP_SHARED, 
-				fd, 
-				0));
+			volatile void* mapResult = 
+				static_cast<volatile void*>(mmap(
+					NULL, 
+					4096, 
+					PROT_READ | PROT_WRITE, 
+					MAP_SHARED, 
+					fd, 
+					0));
 
 			if (mapResult == MAP_FAILED)
 			{

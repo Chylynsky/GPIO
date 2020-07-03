@@ -1,8 +1,23 @@
+# GPIO
+
 GPIO.sln
 GPIO.vcxproj
 GPIO.vcxproj.user
 
-/obj
-/bin
+/GPIO/obj
+/GPIO/bin
+/GPIO/readme
+
+# GPIOdriver
+
+GPIOdriver.sln
+GPIOdriver.vcxproj
+GPIOdriver.vcxproj.user
+
+/GPIOdriver/obj
+/GPIOdriver/bin
+/GPIOdriver/readme
+
+# Common
+
 /.vs
-/readme
