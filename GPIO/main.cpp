@@ -12,7 +12,7 @@ using namespace std::this_thread;
 
 int main()
 {
-	constexpr uint32_t LED_PIN_NUMBER{ 26 };
+	/*constexpr uint32_t LED_PIN_NUMBER{ 26 };
 	constexpr uint32_t BTN_PIN_NUMBER{ 25 };
 
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
@@ -42,5 +42,9 @@ int main()
 
 	// Exit ater 60 seconds
 	sleep_for(60s);
+	*/
+
+	cout << open("/dev/gpiodev", O_RDWR | O_SYNC);
+	sleep_for(1s);
     return 0;
 }
