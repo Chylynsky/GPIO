@@ -32,7 +32,7 @@ namespace rpi
 	{
 		static_assert(__Is_integral<_Reg>, "_Reg must be of integral type.");
 
-		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function
+		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function.
 		std::thread event_poll_thread;				// Thread on which events are polled.
 		std::mutex event_poll_mtx;					// Mutex for resource access control.
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.

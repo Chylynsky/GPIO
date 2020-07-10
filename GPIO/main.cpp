@@ -44,7 +44,9 @@ int main()
 	sleep_for(60s);
 	*/
 
-	cout << open("/dev/gpiodev", O_RDWR | O_SYNC);
+	int buf[] = { 1, 2, 3, 4 };
+	__file_descriptor fd{ "/dev/gpiodev", O_RDWR };
+	write(fd, buf, 4 * sizeof(int));
 	sleep_for(1s);
     return 0;
 }

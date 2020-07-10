@@ -1,23 +1,13 @@
-# GPIO
+# Visual Studio directories
+/.vs
+*/obj
+*/bin
+*/readme
 
-GPIO.sln
-GPIO.vcxproj
-GPIO.vcxproj.user
-
-/GPIO/obj
-/GPIO/bin
-/GPIO/readme
-
-# GPIOdriver
-
-GPIOdriver.sln
-GPIOdriver.vcxproj
-GPIOdriver.vcxproj.user
-
-/GPIOdriver/obj
-/GPIOdriver/bin
-/GPIOdriver/readme
+# Visual Studio files
+*.sln
+*.vcxproj
+*.vcxproj.user
 
 # Common
-
-/.vs
+*/transfer_files.bat
