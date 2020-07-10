@@ -47,6 +47,7 @@ int main()
 	int buf[] = { 1, 2, 3, 4 };
 	__file_descriptor fd{ "/dev/gpiodev", O_RDWR };
 	write(fd, buf, 4 * sizeof(int));
+	read(fd, buf, 2);
 	sleep_for(1s);
     return 0;
 }
