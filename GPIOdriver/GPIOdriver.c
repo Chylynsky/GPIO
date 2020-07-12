@@ -35,12 +35,11 @@ struct buffer
 /* gpiodev device representation */
 struct gpiodev
 {
-	dev_t dev_no;
-	struct cdev cdev;
-	struct buffer ibuf;
-	struct buffer obuf;
+	dev_t dev_no;			/* Device minor and major number	*/
+	struct cdev cdev;		/* Character device					*/
+	struct buffer ibuf;		/* Input buffer						*/	
+	struct buffer obuf;		/* Output buffer					*/			
 };
-
 
 /*
 	Function declarations
@@ -65,16 +64,19 @@ static void buffer_init(struct buffer* buf);
 static void buffer_free(struct buffer* buf);
 
 /* Write data to the buffer											*/
-static int buffer_write(struct buffer* buf, const char* data, size_t size);
+static ssize_t buffer_write(struct buffer* buf, const char* data, size_t size);
 
 /* Write data from user space to the buffer							*/
-static int buffer_write_from_user(struct buffer* buf, const char* __user data, size_t size);
+static ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t size);
 
 /* Read data from the buffer and write it to the specified pointer	*/
-static size_t buffer_unload(struct buffer* buf, size_t size, char* dest);
+static ssize_t buffer_read(struct buffer* buf, size_t size, char* dest);
 
 /* Read data from the buffer and write it to the user space pointer	*/
-static size_t buffer_unload_to_user(struct buffer* buf, size_t size, char* __user dest);
+static ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest);
+
+/* Reallocate buffer memory */
+static int buffer_extend_if_needed(struct buffer* buf, size_t size_needed);
 
 /* gpiodev 'open' file operation									*/
 static int device_open(struct inode* inode, struct file* file);
@@ -87,7 +89,6 @@ static ssize_t device_read(struct file* file, char* __user buff, size_t size, lo
 
 /* gpiodev 'write' file operation									*/
 static ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs);
-
 
 /* 
 	Global variables 
@@ -108,7 +109,6 @@ static struct file_operations gpiodev_fops = {
 /* Declare module entry and exit points */
 module_init(gpiodev_init);
 module_exit(gpiodev_exit);
-
 
 /* 
 	Function definitions 
@@ -134,7 +134,7 @@ void __exit gpiodev_exit(void)
 	printk(KERN_INFO "module unloaded\n");
 }
 
-int gpiodev_setup(gpiodev* dev, const char* name)
+int gpiodev_setup(struct gpiodev* dev, const char* name)
 {
 	int err = alloc_chrdev_region(&dev->dev_no, 0U, 1U, name);
 
@@ -145,8 +145,8 @@ int gpiodev_setup(gpiodev* dev, const char* name)
 	}
 
 	cdev_init(&dev->cdev, &gpiodev_fops);
-	dev->cdev.owner = THIS_MODULE;
-	dev->cdev.ops = &gpiodev_fops;
+	dev->cdev.owner	= THIS_MODULE;
+	dev->cdev.ops	= &gpiodev_fops;
 
 	err = cdev_add(&dev->cdev, dev->dev_no, 1);
 
@@ -167,7 +167,7 @@ unregister:
 	return -1;
 }
 
-void gpiodev_destroy(gpiodev* dev)
+void gpiodev_destroy(struct gpiodev* dev)
 {
 	cdev_del(&dev->cdev);
 	unregister_chrdev_region(dev->dev_no, 1U);
@@ -190,137 +190,148 @@ void buffer_free(struct buffer* buf)
 	buf->capacity = 0U;
 }
 
-int buffer_write(struct buffer* buf, const char* data, size_t size)
+ssize_t buffer_write(struct buffer* buf, const char* data, size_t size)
 {
-	size_t unread_bytes = buf->size - buf->head;
-	size_t requested_size = unread_bytes + size;
-
 	/*
 		Size of the data to write summed with number of unread bytes
 		should be less or equal the buffer's capacity
 	*/
-	if (buf->capacity < requested_size)
+	if (buffer_extend_if_needed(buf, size))
 	{
-		/* Allocate more memory and assign it to temporary pointer */
-		char* tmp = (char*)kmalloc(2 * requested_size * sizeof(char), GFP_KERNEL);
-
-		if (tmp == NULL)
-		{
-			return -1;
-		}
-
-		/* Copy unread bytes to the new memory */
-		for (size_t i = 0U; buf->head != buf->size; i++)
-		{
-			tmp[i] = buf->arr[buf->head];
-			buf->head++;
-		}
-
-		kfree((void*)buf->arr);					/* Deallocate old memory				*/
-		buf->arr = tmp;							/* Assign new memory to the buffer		*/
-		buf->head = 0U;							/* Reset head							*/
-		buf->capacity = 2 * requested_size;		/* Set new capacity						*/
-	}
-
-	/* Copy data to buffer */
-	for (size_t i = 0U; i < size; i++)
-	{
-		buf->arr[buf->head] = data[i];
-		buf->head++;
-	}
-
-	buf->size = requested_size;					/* Set new size							*/
-		
-	return 0;
-}
-
-int buffer_write_from_user(buffer* buf, const char* __user data, size_t size)
-{
-	size_t unread_bytes = buf->size - buf->head;
-	size_t requested_size = unread_bytes + size;
-
-	/*
-		Size of the data to write summed with number of unread bytes
-		should be less or equal the buffer's capacity
-	*/
-	if (buf->capacity < requested_size)
-	{
-		/* Allocate more memory and assign it to temporary pointer */
-		char* tmp = (char*)kmalloc(2 * requested_size * sizeof(char), GFP_KERNEL);
-
-		if (tmp == NULL)
-		{
-			return -1;
-		}
-
-		/* Copy unread bytes to the new memory */
-		for (size_t i = 0U; buf->head != buf->size; i++)
-		{
-			tmp[i] = buf->arr[buf->head];
-			buf->head++;
-		}
-
-		kfree((void*)buf->arr);					/* Deallocate old memory				*/
-		buf->arr		= tmp;					/* Assign new memory to the buffer		*/
-		buf->head		= 0U;					/* Reset head							*/
-		buf->size		= unread_bytes;			/* Set new size							*/
-		buf->capacity	= 2 * requested_size;	/* Set new capacity						*/
-	}
-
-	/* Copy data to buffer */
-	unsigned long bytes_copied = copy_from_user((void*)&buf->arr[unread_bytes], (const void*)data, (unsigned long)size);
-	buf->size += bytes_copied;
-
-	if (bytes_copied != size)
-	{
-		printk(KERN_ALERT "buffer_write_from_user data wasn't copied entirely\n");
+		printk(KERN_ALERT "buffer_extend_if_needed failed\n");
 		return -1;
 	}
 
-	return 0;
+	/* Copy data to buffer */
+	size_t i = 0U;
+	while (i < size)
+	{
+		buf->arr[buf->head + i] = data[i];
+		i++;
+	}
+
+	buf->size += size;	/* Set new size */
+		
+	return size;
 }
 
-size_t buffer_unload(struct buffer* buf, size_t size, char* dest)
+ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t size)
 {
-	/* Size of data left in the buffer				*/
-	size_t bytes_available = buf->size - buf->head + 1U;
-	/* Number of bytes written to the dest memory	*/
-	size_t bytes_read = 0U;
-	/* Size of data to be read						*/
-	const size_t bytes_to_read = (bytes_available > size) ? size : buf->size;
+	/*
+		Size of the data to write summed with number of unread bytes
+		should be less or equal the buffer's capacity
+	*/
+	if (buffer_extend_if_needed(buf, size))
+	{
+		printk(KERN_ALERT "buffer_extend_if_needed failed\n");
+		return -1;
+	}
 
-	/* Copy data to dest							*/
-	for (size_t i = 0U; i < bytes_to_read; i++)
+	/* Copy data to buffer */
+	unsigned long bytes_not_copied = copy_from_user((void*)&buf->arr[buf->size], (const void*)data, (unsigned long)size);
+	unsigned long bytes_copied = size - bytes_not_copied;
+	buf->size += bytes_copied;
+
+	printk(KERN_INFO "copied %u bytes from user\n", bytes_copied);
+	return bytes_copied;
+}
+
+ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
+{
+	/* Size of data to be read						*/
+	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
+
+	/* Copy data to dest */
+	size_t i = 0U;
+	while (i < bytes_to_copy)
 	{
 		dest[i] = buf->arr[buf->head];
 		buf->head++;
-		bytes_read++;
+		i++;
+	}
+	/* Set new buffer size							*/
+	buf->size -= bytes_to_copy;
+
+	/* Reset head if all data was copied to user	*/
+	if (buf->size == 0U)
+	{
+		buf->head = 0U;
 	}
 
-	return bytes_read;
+	return bytes_to_copy;
 }
 
-size_t buffer_unload_to_user(buffer* buf, size_t size, char* __user dest)
+ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
 {
-	/* Size of data left in the buffer				*/
-	size_t bytes_available = buf->size - buf->head + 1U;
 	/* Size of data to be read						*/
-	size_t bytes_to_read = (bytes_available > size) ? size : buf->size;
+	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
+	/* Number of bytes that could not be read */
+	const size_t bytes_not_copied = (size_t)copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_copy);
+	/* Bytes copied to dest */
+	const size_t bytes_copied = size - bytes_not_copied;
+	/* Set new buffer size							*/
+	buf->size -= bytes_copied;
+	/* Move head									*/
+	buf->head += bytes_copied;
 
-	/* Copy data to dest							*/
-	copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_read);
+	/* Reset head if all data was copied to user	*/
+	if (buf->size == 0U)
+	{
+		buf->head = 0U;
+	}
 
-	return bytes_to_read;
+	printk(KERN_INFO "copied %u bytes to user\n", bytes_copied);
+	return bytes_copied;
 }
 
-int device_open(inode* inode, file* file)
+int buffer_extend_if_needed(struct buffer* buf, size_t size_needed)
+{
+	const size_t unread_bytes = buf->size;
+	const size_t space_left = buf->capacity - buf->head + unread_bytes;
+
+	/*
+		Resize if data can't fit in the space left
+	*/
+	if (space_left < size_needed)
+	{
+		const size_t requested_size = unread_bytes + size_needed;
+		/* Allocate more memory and assign it to temporary pointer */
+		char* tmp = (char*)kmalloc(requested_size * sizeof(char), GFP_KERNEL);
+
+		if (tmp == NULL)
+		{
+			printk(KERN_ALERT "buffer_extend_if_needed kmalloc error\n");
+			return -1;
+		}
+
+		/* Copy unread bytes to the new memory location */
+		size_t i = buf->head;
+		while (i != buf->size)
+		{
+			tmp[i] = buf->arr[buf->head + i];
+			i++;
+		}
+
+		kfree((void*)buf->arr);				/* Deallocate old memory				*/
+		buf->arr		= tmp;				/* Assign new memory to the buffer		*/
+		buf->head		= 0U;				/* Reset head							*/
+		buf->size		= unread_bytes;		/* Set new size							*/
+		buf->capacity	= requested_size;	/* Set new capacity						*/
+
+		printk(KERN_INFO "succesfully allocated %i bytes\n", requested_size);
+	}
+
+	return 0;
+}
+
+int device_open(struct inode* inode, struct file* file)
 {
 	buffer_init(&dev.ibuf);
 	buffer_init(&dev.obuf);
 	return 0;
 }
 
-int device_release(inode* inode, file* file)
+int device_release(struct inode* inode, struct file* file)
 {
 	buffer_free(&dev.ibuf);
 	buffer_free(&dev.obuf);
@@ -329,14 +340,12 @@ int device_release(inode* inode, file* file)
 
 ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs)
 {
-	ssize_t data_read = (ssize_t)buffer_unload_to_user(&dev.obuf, size, buff);
 	printk(KERN_INFO "read!\n");
-	return data_read;
+	return (ssize_t)buffer_to_user(&dev.ibuf, size, buff);;
 }
 
 ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs)
 {
-	buffer_write_from_user(&dev.ibuf, buff, size);
 	printk(KERN_INFO "write!\n");
-	return 0;
+	return (ssize_t)buffer_from_user(&dev.ibuf, buff, size);;
 }
