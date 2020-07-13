@@ -6,9 +6,10 @@
 #include <linux/slab.h>
 #include <linux/cdev.h>
 #include <linux/errno.h>
-#include <linux/gpio/consumer.h>
+#include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/uaccess.h>
+#include <linux/gpio.h>
 
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
@@ -74,6 +75,9 @@ static ssize_t buffer_read(struct buffer* buf, size_t size, char* dest);
 
 /* Read data from the buffer and write it to the user space pointer	*/
 static ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest);
+
+/* Read int value from the buffer to the dest pointer				*/
+static ssize_t buffer_next_int(struct buffer* buf, int* dest);
 
 /* Reallocate buffer memory */
 static int buffer_extend_if_needed(struct buffer* buf, size_t size_needed);
@@ -146,7 +150,7 @@ int gpiodev_setup(struct gpiodev* dev, const char* name)
 
 	cdev_init(&dev->cdev, &gpiodev_fops);
 	dev->cdev.owner	= THIS_MODULE;
-	dev->cdev.ops	= &gpiodev_fops;
+	dev->cdev.ops = &gpiodev_fops;
 
 	err = cdev_add(&dev->cdev, dev->dev_no, 1);
 
@@ -241,7 +245,7 @@ ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
 	/* Size of data to be read						*/
 	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
 
-	/* Copy data to dest */
+	/* Copy data to dest							*/
 	size_t i = 0U;
 	while (i < bytes_to_copy)
 	{
@@ -282,6 +286,22 @@ ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
 
 	printk(KERN_INFO "copied %u bytes to user\n", bytes_copied);
 	return bytes_copied;
+}
+
+ssize_t buffer_next_int(struct buffer* buf, int* dest)
+{
+	if (buf->size < sizeof(int))
+		return (ssize_t)-1;
+
+	int i = 8U * (sizeof(int) - 1U);
+	while (i >= 0)
+	{
+		*dest |= (buf->arr[buf->head] & 0xFF) << i;
+		buf->head++;
+		i -= 8;
+	}
+
+	return (ssize_t)0;
 }
 
 int buffer_extend_if_needed(struct buffer* buf, size_t size_needed)
@@ -340,12 +360,12 @@ int device_release(struct inode* inode, struct file* file)
 
 ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs)
 {
-	printk(KERN_INFO "read!\n");
-	return (ssize_t)buffer_to_user(&dev.ibuf, size, buff);;
+	printk(KERN_INFO "read\n");
+	return buffer_to_user(&dev.obuf, size, buff);
 }
 
 ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs)
 {
-	printk(KERN_INFO "write!\n");
-	return (ssize_t)buffer_from_user(&dev.ibuf, buff, size);;
+	printk(KERN_INFO "write\n");
+	return buffer_from_user(&dev.ibuf, buff, size);
 }

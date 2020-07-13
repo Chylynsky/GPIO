@@ -77,13 +77,28 @@ namespace rpi
 	/*
 		Functor used to map memory and access it easily.
 	*/
+	template<typename _Reg>
 	class __Get_reg_ptr
 	{
-		static volatile uint32_t* GPIO_REGISTER_BASE_MAPPED;
+		static volatile _Reg* GPIO_REGISTER_BASE_MAPPED;
 
-		static volatile uint32_t* MapMemoryAddressSpace()
+		static volatile _Reg* MapMemoryAddressSpace()
 		{
-			__file_descriptor fd{ "/dev/gpiomem", O_RDWR | O_SYNC };
+			off_t offs = 0L;
+			std::unique_ptr<__file_descriptor> fd;
+
+			try {
+				fd = std::unique_ptr<__file_descriptor>(new __file_descriptor("/dev/gpiomem", O_RDWR | O_SYNC));
+			}
+			catch (const std::runtime_error& e) {
+				try {
+					fd = std::unique_ptr<__file_descriptor>(new __file_descriptor("/dev/mem", O_RDWR | O_SYNC));
+					offs = 0x20000000;
+				}
+				catch (const std::runtime_error& e) {
+					throw e; // There is nothing else to do...
+				}
+			}
 
 			volatile void* mapResult = 
 				static_cast<volatile void*>(mmap(
@@ -91,30 +106,32 @@ namespace rpi
 					4096, 
 					PROT_READ | PROT_WRITE, 
 					MAP_SHARED, 
-					fd, 
-					0));
+					*fd,
+					offs));
 
 			if (mapResult == MAP_FAILED)
 			{
 				throw std::runtime_error("Unable to map memory.");
 			}
 
-			return reinterpret_cast<volatile uint32_t*>(mapResult);
+			return reinterpret_cast<volatile _Reg*>(mapResult);
 		}
 
 	public:
 
-		volatile uint32_t* operator()(uint32_t reg_offset) const noexcept
+		volatile _Reg* operator()(_Reg reg_offset) const noexcept
 		{
 			return GPIO_REGISTER_BASE_MAPPED + reg_offset;
 		}
 	};
 
-	inline volatile uint32_t* __Get_reg_ptr::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
+	template<typename _Reg>
+	inline volatile _Reg* __Get_reg_ptr<_Reg>::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
 
 	/* 
 		Global function object. Returns volatile uint32_t pointer
 		to the mapped register.
 	*/
-	static __Get_reg_ptr __get_reg_ptr;
+	template<typename _Reg>
+	static __Get_reg_ptr<_Reg> __get_reg_ptr;
 }

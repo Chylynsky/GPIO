@@ -79,7 +79,7 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	inline void __gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
-		volatile _Reg* base_event_reg = __get_reg_ptr(__addr::GPEDS0);
+		volatile _Reg* base_event_reg = __get_reg_ptr<_Reg>(__addr::GPEDS0);
 
 		while (!event_poll_thread_exit)
 		{
