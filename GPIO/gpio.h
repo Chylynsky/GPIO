@@ -15,7 +15,7 @@
 #if defined(BCM2711)
 #include "bcm2711.h"
 #else
-static_assert(0, "Processor model must be specified as a macro definition before including gpio.h.")
+static_assert(0, "Processor model must be specified as a macro definition before including gpio.h.");
 #endif
 
 namespace rpi
@@ -25,10 +25,10 @@ namespace rpi
 		specified by the template type _Dir and register type _Reg.
 	*/
 	template<typename _Dir, typename _Reg = __addr::reg_t>
-	class gpio : private __Select_if<__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
+	class gpio : private __pred::__Select_if<__pred::__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
 	{
-		static_assert(__Is_direction<_Dir>, "Template type _Dir must be either dir::input or dir::output.");
-		static_assert(__Is_integral<_Reg>, "Template type _Reg must be integral.");
+		static_assert(__pred::__Is_direction<_Dir>, "Template type _Dir must be either dir::input or dir::output.");
+		static_assert(__pred::__Is_integral<_Reg>, "Template type _Reg must be integral.");
 
 		// Select FSEL register offset based on GPIO pin number.
 		volatile _Reg* get_fsel_reg();
@@ -44,29 +44,29 @@ namespace rpi
 		// Output methods
 
 		template<typename _Arg = int, typename _Ty = _Dir>
-		__Enable_if<__Is_output<_Ty>, void> operator=(_Arg state) noexcept;
+		__pred::__Enable_if<__pred::__Is_output<_Ty>, void> operator=(_Arg state) noexcept;
 
 		// Write to GPIO pin
 		template<typename _Arg = int, typename _Ty = _Dir>
-		__Enable_if<__Is_output<_Ty>, void> write(_Arg state) noexcept;
+		__pred::__Enable_if<__pred::__Is_output<_Ty>, void> write(_Arg state) noexcept;
 
 		// Input methods.
 
 		// Read current GPIO pin state.
 		template<typename _Ty = _Dir>
-		__Enable_if<__Is_input<_Ty>, uint32_t> read() const noexcept;
+		__pred::__Enable_if<__pred::__Is_input<_Ty>, uint32_t> read() const noexcept;
 
 		// Set pull-up, pull-down or none.
 		template<typename _Ty = _Dir>
-		__Enable_if<__Is_input<_Ty>, void> set_pull(pull pull_sel) noexcept;
+		__pred::__Enable_if<__pred::__Is_input<_Ty>, void> set_pull(pull pull_sel) noexcept;
 
 		// Get current pull type.
 		template<typename _Ty = _Dir>
-		__Enable_if<__Is_input<_Ty>, pull> get_pull() noexcept;
+		__pred::__Enable_if<__pred::__Is_input<_Ty>, pull> get_pull() noexcept;
 
 		// Set event callback.
 		template<typename _Ev, typename _Ty = _Dir>
-		__Enable_if<__Is_input<_Ty> && __Is_event<_Ev>, void> attach_irq_callback(callback_t callback) noexcept;
+		__pred::__Enable_if<__pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> attach_irq_callback(callback_t callback) noexcept;
 
 		// Deleted methods.
 
@@ -111,14 +111,14 @@ namespace rpi
 		uint32_t reg_index = pin_number / reg_size<_Reg>;
 
 		// Enable only when instantiated with input template parameter.
-		if constexpr (__Is_input<_Dir>)
+		if constexpr (__pred::__Is_input<_Dir>)
 		{
 			*fsel_reg |= static_cast<uint32_t>(__function_select::gpio_pin_as_input) << fsel_bit_shift;
 			__gpio_input<_Reg>::lev_reg = __get_reg_ptr<_Reg>(__addr::GPLEV0 + reg_index);
 		}
 		
 		// Enable only when instantiated with output template parameter.
-		if constexpr (__Is_output<_Dir>)
+		if constexpr (__pred::__Is_output<_Dir>)
 		{
 			*fsel_reg |= static_cast<uint32_t>(__function_select::gpio_pin_as_output) << fsel_bit_shift;
 
@@ -132,7 +132,7 @@ namespace rpi
 	inline gpio<_Dir, _Reg>::~gpio()
 	{
 		// Enable only when instantiated with input template parameter.
-		if constexpr (__Is_input<_Dir>)
+		if constexpr (__pred::__Is_input<_Dir>)
 		{
 			_Reg reg_bit_clr_val = ~reg_bit_set_val;
 			uint32_t reg_index = pin_number / reg_size<_Reg>;
@@ -152,7 +152,7 @@ namespace rpi
 		}
 
 		// Enable only when instantiated with output template parameter.
-		if constexpr (__Is_output<_Dir>)
+		if constexpr (__pred::__Is_output<_Dir>)
 		{
 			*__gpio_output<_Reg>::clr_reg |= reg_bit_set_val;
 		}
@@ -163,16 +163,16 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Arg, typename _Ty>
-	inline __Enable_if<__Is_output<_Ty>, void> gpio<_Dir, _Reg>::operator=(_Arg state) noexcept
+	inline __pred::__Enable_if<__pred::__Is_output<_Ty>, void> gpio<_Dir, _Reg>::operator=(_Arg state) noexcept
 	{
 		write(state);
 	}
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Arg, typename _Ty>
-	inline __Enable_if<__Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
+	inline __pred::__Enable_if<__pred::__Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
 	{
-		static_assert(__Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
+		static_assert(__pred::__Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
 
 		// Set '1' in SET or CLR register.
 		if (!state)
@@ -187,14 +187,14 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline __Enable_if<__Is_input<_Ty>, uint32_t> gpio<_Dir, _Reg>::read() const noexcept
+	inline __pred::__Enable_if<__pred::__Is_input<_Ty>, uint32_t> gpio<_Dir, _Reg>::read() const noexcept
 	{
 		return (*__gpio_input<_Reg>::lev_reg >> (pin_number % reg_size<_Reg>)) & 1U;
 	}
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline __Enable_if<__Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_pull(pull pull_sel) noexcept
+	inline __pred::__Enable_if<__pred::__Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_pull(pull pull_sel) noexcept
 	{
 		// 16 pins are controlled by each register.
 		volatile _Reg* reg_sel = __get_reg_ptr<_Reg>(__addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
@@ -209,7 +209,7 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ty>
-	inline __Enable_if<__Is_input<_Ty>, pull> gpio<_Dir, _Reg>::get_pull() noexcept
+	inline __pred::__Enable_if<__pred::__Is_input<_Ty>, pull> gpio<_Dir, _Reg>::get_pull() noexcept
 	{
 		// 16 pins are controlled by each register.
 		volatile _Reg* reg_sel = __get_reg_ptr<_Reg>(__addr::GPIO_PUP_PDN_CNTRL_REG0 + (pin_number / 16U));
@@ -218,10 +218,11 @@ namespace rpi
 
 	template<typename _Dir, typename _Reg>
 	template<typename _Ev, typename _Ty>
-	inline __Enable_if<__Is_input<_Ty> && __Is_event<_Ev>, void> gpio<_Dir, _Reg>::attach_irq_callback(callback_t callback) noexcept
+	inline __pred::__Enable_if<__pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> 
+		gpio<_Dir, _Reg>::attach_irq_callback(callback_t callback) noexcept
 	{
 		// Get event register based on event type.
-		volatile _Reg* event_reg = __get_reg_ptr<_Reg>(__Event_reg_offs<_Ev> + pin_number / reg_size<_Reg>);
+		volatile _Reg* event_reg = __get_reg_ptr<_Reg>(__Event_reg_offs<_Reg, _Ev> + pin_number / reg_size<_Reg>);
 
 		// Clear then set bit responsible for the selected pin.
 		*event_reg &= ~reg_bit_set_val;

@@ -17,5 +17,5 @@ namespace rpi
 	};
 
 	template<typename _Reg>
-	__gpio_callback_map<_Reg, callback_t> __gpio_input<_Reg>::callback_map;
+	__gpio_callback_map<_Reg, callback_t> __gpio_input<_Reg>::callback_map{};
 }

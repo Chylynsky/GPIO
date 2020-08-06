@@ -17,6 +17,8 @@
 
 #if defined(BCM2711)
 #include "bcm2711.h"
+#else
+static_assert(0, "No processor model was specified.")
 #endif
 
 namespace rpi
@@ -30,7 +32,7 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	class __gpio_callback_map
 	{
-		static_assert(__Is_integral<_Reg>, "_Reg must be of integral type.");
+		static_assert(__pred::__Is_integral<_Reg>, "_Reg must be of integral type.");
 
 		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function.
 		std::thread event_poll_thread;				// Thread on which events are polled.
@@ -55,7 +57,7 @@ namespace rpi
 	};
 
 	template<typename _Reg, typename _Fun>
-	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }, fd{ "/dev/gpiodev", O_RDWR }
+	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
 	{
 		event_poll_thread = std::thread(std::bind(&__gpio_callback_map<_Reg, _Fun>::poll_events, this));
 	}

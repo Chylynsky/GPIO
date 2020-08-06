@@ -5,7 +5,7 @@
 #if defined(BCM2711)
 #include "bcm2711.h"
 #else
-static_assert(0, "No processor model was specified.")
+static_assert(0, "No processor model was specified.");
 #endif
 
 namespace rpi
@@ -54,21 +54,20 @@ namespace rpi
 		};
 	}
 
-	/*
-		Additional helper predicates for events.
-	*/
+	namespace __pred
+	{
+		/*
+			Additional helper predicate for events.
+		*/
 
-	// Get base event register offs.
-	template<typename _Ev>
-	inline constexpr __addr::reg_t __Event_reg_offs = _Ev::offs;
-
-	// Check if the specified type is an event.
-	template<typename _Ty>
-	inline constexpr bool __Is_event = 
-		__Is_same<_Ty, irq::rising_edge>			||
-		__Is_same<_Ty, irq::falling_edge>			||
-		__Is_same<_Ty, irq::pin_high>				||
-		__Is_same<_Ty, irq::pin_low>				||
-		__Is_same<_Ty, irq::async_rising_edge>		||
-		__Is_same<_Ty, irq::async_falling_edge>;
+		// Check if the specified type is an event.
+		template<typename _Ty>
+		inline constexpr bool __Is_event =
+			__Is_same<_Ty, irq::rising_edge> ||
+			__Is_same<_Ty, irq::falling_edge> ||
+			__Is_same<_Ty, irq::pin_high> ||
+			__Is_same<_Ty, irq::pin_low> ||
+			__Is_same<_Ty, irq::async_rising_edge> ||
+			__Is_same<_Ty, irq::async_falling_edge>;
+	}
 }

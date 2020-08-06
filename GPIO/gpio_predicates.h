@@ -2,7 +2,7 @@
 #include <type_traits>
 #include "gpio_direction.h"
 
-namespace rpi
+namespace rpi::__pred
 {
 	template<bool _Cond, typename _Ty = void>
 	using __Enable_if = typename std::enable_if_t<_Cond, _Ty>;
@@ -27,6 +27,6 @@ namespace rpi
 
 	template<typename _Dir>
 	inline constexpr bool __Is_direction = 
-		__Is_same<_Dir, dir::output> || 
-		__Is_same<_Dir, dir::input>;
+		__Is_input<_Dir> ||
+		__Is_output<_Dir>;
 }

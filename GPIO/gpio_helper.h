@@ -87,7 +87,7 @@ namespace rpi
 			std::unique_ptr<__file_descriptor> fd;
 
 			try {
-				fd = std::unique_ptr<__file_descriptor>(new __file_descriptor("/dev/gpiomem", O_RDWR | O_SYNC));
+				fd = std::make_unique<__file_descriptor>("/dev/gpiomem", O_RDWR | O_SYNC);
 			}
 			catch (const std::runtime_error& e) {
 				throw e; // No '/dev/gpiomem' file
@@ -126,5 +126,9 @@ namespace rpi
 		to the mapped register.
 	*/
 	template<typename _Reg>
-	inline const __Get_reg_ptr<_Reg> __get_reg_ptr;
+	inline const __Get_reg_ptr<_Reg> __get_reg_ptr{};
+
+	// Get base event register offs.
+	template<typename _Reg, typename _Ev>
+	inline constexpr _Reg __Event_reg_offs = _Ev::offs;
 }

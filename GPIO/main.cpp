@@ -18,8 +18,8 @@ int main()
 
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
 	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
-	
 	pinBtn.set_pull(pull::up);	// Set pull up resistor
+	
 	// Create callback lambda that makes an LED blink twice
 	auto blink = [&pinLED]
 	{
@@ -36,10 +36,11 @@ int main()
 		sleep_for(100ms);
 	};
 
-	// Call "blink" function when signal is pulled down by the button
+	// Call "blink" lambda when signal is pulled down by the button
 	pinBtn.attach_irq_callback<irq::falling_edge>(blink);
 
 	cout << "Push the button attached to pin 25 and enjoy the blinking LED!" << endl;
+	cout << "The program will exit after 60 seconds." << endl;
 
 	// Exit ater 60 seconds
 	sleep_for(60s);
