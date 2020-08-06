@@ -24,7 +24,7 @@ namespace rpi
 		Template class gpio allows access to gpio with direction
 		specified by the template type _Dir and register type _Reg.
 	*/
-	template<typename _Dir, typename _Reg = reg_t>
+	template<typename _Dir, typename _Reg = __addr::reg_t>
 	class gpio : private __Select_if<__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
 	{
 		static_assert(__Is_direction<_Dir>, "Template type _Dir must be either dir::input or dir::output.");

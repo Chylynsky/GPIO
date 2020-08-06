@@ -3,7 +3,7 @@
 #include <iostream>
 #include <bitset>
 
-#define BCM2711
+#define BCM2711		// Processor model must be specified before including gpio.h
 #include "gpio.h"
 
 using namespace rpi;

@@ -55,7 +55,7 @@ namespace rpi
 	};
 
 	template<typename _Reg, typename _Fun>
-	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
+	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }, fd{ "/dev/gpiodev", O_RDWR }
 	{
 		event_poll_thread = std::thread(std::bind(&__gpio_callback_map<_Reg, _Fun>::poll_events, this));
 	}

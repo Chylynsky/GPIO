@@ -1,3 +1,5 @@
+#define CONFIG_GPIOLIB
+
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -6,7 +8,6 @@
 #include <linux/slab.h>
 #include <linux/cdev.h>
 #include <linux/errno.h>
-#include <linux/irq.h>
 #include <linux/interrupt.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
@@ -36,10 +37,11 @@ struct buffer
 /* gpiodev device representation */
 struct gpiodev
 {
-	dev_t dev_no;			/* Device minor and major number	*/
-	struct cdev cdev;		/* Character device					*/
-	struct buffer ibuf;		/* Input buffer						*/	
-	struct buffer obuf;		/* Output buffer					*/			
+	dev_t dev_no;					/* Device minor and major number	*/
+	struct cdev cdev;				/* Character device					*/
+	struct buffer ibuf;				/* Input buffer						*/	
+	struct buffer obuf;				/* Output buffer					*/
+	unsigned int irq;
 };
 
 /*
@@ -70,16 +72,19 @@ static ssize_t buffer_write(struct buffer* buf, const char* data, size_t size);
 /* Write data from user space to the buffer							*/
 static ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t size);
 
+/* Write unsigned int number to the buffer							*/
+static ssize_t buffer_write_uint(struct buffer* buf, unsigned int val);
+
 /* Read data from the buffer and write it to the specified pointer	*/
 static ssize_t buffer_read(struct buffer* buf, size_t size, char* dest);
 
 /* Read data from the buffer and write it to the user space pointer	*/
 static ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest);
 
-/* Read int value from the buffer to the dest pointer				*/
-static ssize_t buffer_next_int(struct buffer* buf, int* dest);
+/* Copy int value from the buffer to the dest pointer (MSB first)	*/
+static ssize_t buffer_read_uint(struct buffer* buf, unsigned int* dest);
 
-/* Reallocate buffer memory */
+/* Reallocate buffer memory											*/
 static int buffer_extend_if_needed(struct buffer* buf, size_t size_needed);
 
 /* gpiodev 'open' file operation									*/
@@ -94,12 +99,16 @@ static ssize_t device_read(struct file* file, char* __user buff, size_t size, lo
 /* gpiodev 'write' file operation									*/
 static ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs);
 
+static irqreturn_t irq_handler(int irq, void* dev_id);
+
 /* 
 	Global variables 
 */
 
 /* gpiodev instance */
 static struct gpiodev dev;
+
+unsigned int pin = 25U;
 
 /* File operations function pointers assignments */
 static struct file_operations gpiodev_fops = {
@@ -118,21 +127,13 @@ module_exit(gpiodev_exit);
 	Function definitions 
 */
 
-int __init gpiodev_init(void) 
+inline int __init gpiodev_init(void)
 {
-	int err = gpiodev_setup(&dev, DEVICE_NAME);
-
-	if (err)
-	{
-		printk(KERN_ALERT "an error occured while loading the module\n");
-		return -1;
-	}
-
 	printk(KERN_INFO "module loaded\n");
-	return 0;
+	return gpiodev_setup(&dev, DEVICE_NAME);
 }
 
-void __exit gpiodev_exit(void) 
+inline void __exit gpiodev_exit(void)
 {
 	gpiodev_destroy(&dev);
 	printk(KERN_INFO "module unloaded\n");
@@ -171,13 +172,13 @@ unregister:
 	return -1;
 }
 
-void gpiodev_destroy(struct gpiodev* dev)
+inline void gpiodev_destroy(struct gpiodev* dev)
 {
 	cdev_del(&dev->cdev);
 	unregister_chrdev_region(dev->dev_no, 1U);
 }
 
-void buffer_init(struct buffer* buf)
+inline void buffer_init(struct buffer* buf)
 {
 	buf->arr = NULL;
 	buf->head = 0U;
@@ -185,7 +186,7 @@ void buffer_init(struct buffer* buf)
 	buf->capacity = 0U;
 }
 
-void buffer_free(struct buffer* buf)
+inline void buffer_free(struct buffer* buf)
 {
 	kfree((void*)buf->arr);
 	buf->arr = NULL;
@@ -194,7 +195,7 @@ void buffer_free(struct buffer* buf)
 	buf->capacity = 0U;
 }
 
-ssize_t buffer_write(struct buffer* buf, const char* data, size_t size)
+inline ssize_t buffer_write(struct buffer* buf, const char* data, size_t size)
 {
 	/*
 		Size of the data to write summed with number of unread bytes
@@ -207,10 +208,11 @@ ssize_t buffer_write(struct buffer* buf, const char* data, size_t size)
 	}
 
 	/* Copy data to buffer */
+	size_t last_byte = buf->head + buf->size;
 	size_t i = 0U;
 	while (i < size)
 	{
-		buf->arr[buf->head + i] = data[i];
+		buf->arr[last_byte + i] = data[i];
 		i++;
 	}
 
@@ -219,7 +221,7 @@ ssize_t buffer_write(struct buffer* buf, const char* data, size_t size)
 	return size;
 }
 
-ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t size)
+inline ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t size)
 {
 	/*
 		Size of the data to write summed with number of unread bytes
@@ -232,15 +234,29 @@ ssize_t buffer_from_user(struct buffer* buf, const char* __user data, size_t siz
 	}
 
 	/* Copy data to buffer */
-	unsigned long bytes_not_copied = copy_from_user((void*)&buf->arr[buf->size], (const void*)data, (unsigned long)size);
+	unsigned long bytes_not_copied = copy_from_user((void*)&buf->arr[buf->head + buf->size], (const void*)data, (unsigned long)size);
 	unsigned long bytes_copied = size - bytes_not_copied;
 	buf->size += bytes_copied;
 
-	printk(KERN_INFO "copied %u bytes from user\n", bytes_copied);
+	printk(KERN_INFO "%u bytes copied from user\n", bytes_copied);
 	return bytes_copied;
 }
 
-ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
+ssize_t buffer_write_uint(struct buffer* buf, unsigned int val)
+{
+	if (buffer_extend_if_needed(buf, sizeof(unsigned int)))
+	{
+		printk(KERN_ALERT "buffer_extend_if_needed failed\n");
+		return -1;
+	}
+
+	*((unsigned int*)&buf->arr[buf->head]) = val;
+	buf->size += sizeof(unsigned int);
+
+	return 0;
+}
+
+inline ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
 {
 	/* Size of data to be read						*/
 	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
@@ -265,13 +281,13 @@ ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
 	return bytes_to_copy;
 }
 
-ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
+inline ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
 {
 	/* Size of data to be read						*/
 	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
-	/* Number of bytes that could not be read */
+	/* Number of bytes that could not be read		*/
 	const size_t bytes_not_copied = (size_t)copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_copy);
-	/* Bytes copied to dest */
+	/* Bytes copied to dest							*/
 	const size_t bytes_copied = size - bytes_not_copied;
 	/* Set new buffer size							*/
 	buf->size -= bytes_copied;
@@ -284,21 +300,21 @@ ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
 		buf->head = 0U;
 	}
 
-	printk(KERN_INFO "copied %u bytes to user\n", bytes_copied);
+	printk(KERN_INFO "%u bytes copied to user\n", bytes_copied);
 	return bytes_copied;
 }
 
-ssize_t buffer_next_int(struct buffer* buf, int* dest)
+inline ssize_t buffer_read_uint(struct buffer* buf, unsigned int* dest)
 {
-	if (buf->size < sizeof(int))
-		return (ssize_t)-1;
+	*dest = *((unsigned int*)(&buf->arr[buf->head]));
 
-	int i = 8U * (sizeof(int) - 1U);
-	while (i >= 0)
+	buf->head += sizeof(unsigned int);
+	buf->size -= sizeof(unsigned int);
+
+	/* Reset head if all data was copied to dest */
+	if (buf->size == 0U)
 	{
-		*dest |= (buf->arr[buf->head] & 0xFF) << i;
-		buf->head++;
-		i -= 8;
+		buf->head = 0U;
 	}
 
 	return (ssize_t)0;
@@ -338,34 +354,65 @@ int buffer_extend_if_needed(struct buffer* buf, size_t size_needed)
 		buf->size		= unread_bytes;		/* Set new size							*/
 		buf->capacity	= requested_size;	/* Set new capacity						*/
 
-		printk(KERN_INFO "succesfully allocated %i bytes\n", requested_size);
+		printk(KERN_INFO "succesfully allocated %u bytes\n", requested_size);
 	}
 
 	return 0;
 }
 
-int device_open(struct inode* inode, struct file* file)
+inline int device_open(struct inode* inode, struct file* file)
 {
 	buffer_init(&dev.ibuf);
 	buffer_init(&dev.obuf);
+
+	printk(KERN_INFO "setting interrupt for pin %u\n", pin);
+
+	if (gpio_request(pin, "dupa"))
+	{
+		printk(KERN_ALERT "gpio request failed\n", pin);
+		return -1;
+	}
+
+	dev.irq = gpio_to_irq(pin);
+
+	if (request_irq(dev.irq, (irq_handler_t)irq_handler, IRQF_TRIGGER_LOW, "dupa", DEVICE_NAME))
+	{
+		printk(KERN_ALERT "setting interrupt failed\n", pin);
+		return -1;
+	}
+
 	return 0;
 }
 
-int device_release(struct inode* inode, struct file* file)
+inline int device_release(struct inode* inode, struct file* file)
 {
 	buffer_free(&dev.ibuf);
 	buffer_free(&dev.obuf);
+	free_irq(dev.irq, NULL);
+	gpio_free(pin);
 	return 0;
 }
 
-ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs)
+inline ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs)
 {
-	printk(KERN_INFO "read\n");
+	printk(KERN_INFO "read operation\n");
 	return buffer_to_user(&dev.obuf, size, buff);
 }
 
-ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs)
+inline ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs)
 {
-	printk(KERN_INFO "write\n");
-	return buffer_from_user(&dev.ibuf, buff, size);
+	printk(KERN_INFO "write operation\n");
+	ssize_t bytes_read = buffer_from_user(&dev.ibuf, buff, size);
+
+	unsigned int data_in;
+	buffer_read_uint(&dev.ibuf, &data_in);
+
+	return bytes_read;
+}
+
+irqreturn_t irq_handler(int irq, void* dev_id)
+{
+	printk(KERN_INFO "interrupt detected on pin\n", irq);
+	buffer_write_uint(&dev.obuf, pin);
+	return IRQ_HANDLED;
 }

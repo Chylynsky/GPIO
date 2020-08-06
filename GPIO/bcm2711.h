@@ -8,10 +8,10 @@
 
 namespace rpi
 {
-	using reg_t = uint32_t;
-
 	namespace __addr
 	{
+		using reg_t = uint32_t;
+
 		// GPIO function select offsets
 		inline constexpr reg_t GPFSEL0{ 0x00U / sizeof(reg_t) };	// GPIO function select 0
 		inline constexpr reg_t GPFSEL1{ 0x04U / sizeof(reg_t) };	// GPIO function select 1

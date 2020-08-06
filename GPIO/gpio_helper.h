@@ -14,7 +14,7 @@ namespace rpi
 		Register size in bits.
 	*/
 	template<typename _Reg>
-	inline constexpr uint32_t reg_size = 8U * sizeof(_Reg);
+	inline constexpr _Reg reg_size = 8U * sizeof(_Reg);
 
 	/*
 		Linux file descriptor RAII wrapper.
@@ -84,20 +84,13 @@ namespace rpi
 
 		static volatile _Reg* MapMemoryAddressSpace()
 		{
-			off_t offs = 0L;
 			std::unique_ptr<__file_descriptor> fd;
 
 			try {
 				fd = std::unique_ptr<__file_descriptor>(new __file_descriptor("/dev/gpiomem", O_RDWR | O_SYNC));
 			}
 			catch (const std::runtime_error& e) {
-				try {
-					fd = std::unique_ptr<__file_descriptor>(new __file_descriptor("/dev/mem", O_RDWR | O_SYNC));
-					offs = 0x20000000;
-				}
-				catch (const std::runtime_error& e) {
-					throw e; // There is nothing else to do...
-				}
+				throw e; // No '/dev/gpiomem' file
 			}
 
 			volatile void* mapResult = 
@@ -107,7 +100,7 @@ namespace rpi
 					PROT_READ | PROT_WRITE, 
 					MAP_SHARED, 
 					*fd,
-					offs));
+					0));
 
 			if (mapResult == MAP_FAILED)
 			{
@@ -133,5 +126,5 @@ namespace rpi
 		to the mapped register.
 	*/
 	template<typename _Reg>
-	static __Get_reg_ptr<_Reg> __get_reg_ptr;
+	inline const __Get_reg_ptr<_Reg> __get_reg_ptr;
 }
