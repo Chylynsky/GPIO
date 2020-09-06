@@ -9,7 +9,7 @@
 #include <linux/interrupt.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
-#include <linux/irq.h>
+#include <linux/wait.h>
 
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
@@ -41,8 +41,9 @@ struct gpiodev
 	struct buffer obuf;				/* Output buffer					*/
 };
 
-int irq = -1;
-int pin = -1;
+static wait_queue_head_t wq;
+static unsigned int irq = -1;
+static unsigned int pin = -1;
 
 /*
 	Function declarations
@@ -134,6 +135,7 @@ module_exit(gpiodev_exit);
 int __init gpiodev_init(void)
 {
 	printk(KERN_INFO "module loaded\n");
+	init_waitqueue_head(&wq);
 	return gpiodev_setup(&dev, DEVICE_NAME);
 }
 
@@ -301,12 +303,17 @@ ssize_t buffer_read(struct buffer* buf, size_t size, char* dest)
 
 ssize_t buffer_to_user(struct buffer* buf, size_t size, char* __user dest)
 {
+	if (buf->size == 0U)
+	{
+		return 0;
+	}
+
 	/* Size of data to be read						*/
-	const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
+	const ssize_t bytes_to_copy = (buf->size > size) ? size : buf->size;
 	/* Number of bytes that could not be read		*/
-	const size_t bytes_not_copied = (size_t)copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_copy);
+	const ssize_t bytes_not_copied = (ssize_t)copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_copy);
 	/* Bytes copied to dest							*/
-	const size_t bytes_copied = size - bytes_not_copied;
+	const ssize_t bytes_copied = size - bytes_not_copied;
 	/* Set new buffer size							*/
 	buf->size -= bytes_copied;
 	/* Move head									*/
@@ -328,7 +335,7 @@ ssize_t buffer_read_uint(struct buffer* buf, unsigned int* dest)
 	{
 		return -1;
 	}
-
+	
 	*dest = *((unsigned int*)(&buf->arr[buf->head]));
 
 	buf->head += sizeof(unsigned int);
@@ -414,14 +421,11 @@ int device_open(struct inode* inode, struct file* file)
 
 int device_release(struct inode* inode, struct file* file)
 {
+	wake_up_interruptible(&wq);
+
 	if (irq != -1)
 	{
 		free_irq(irq, DEVICE_NAME);
-	}
-
-	if (pin != -1)
-	{
-		gpio_free(pin);
 	}
 
 	buffer_free(&dev.ibuf);
@@ -432,6 +436,12 @@ int device_release(struct inode* inode, struct file* file)
 ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs)
 {
 	printk(KERN_INFO "read operation\n");
+
+	if (dev.obuf.size == 0U)
+	{
+		wait_event_interruptible_timeout(wq, dev.obuf.size != 0U, 100);
+	}
+
 	return buffer_to_user(&dev.obuf, size, buff);
 }
 
@@ -441,45 +451,36 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 	ssize_t bytes_read = buffer_from_user(&dev.ibuf, buff, size);
 	
 	{
-		unsigned char pin_no;
-		if (buffer_read_byte(&dev.ibuf, &pin_no))
+		unsigned int pin_no;
+		if (buffer_read_uint(&dev.ibuf, &pin_no))
 		{
 			printk(KERN_INFO "unable to retrieve pin number from buffer\n");
 			return -1;
 		}
 
-		if (gpio_request(pin_no, "pin_requested") < 0)
-		{
-			printk(KERN_INFO "request gpio failed\n");
-			return -1;
-		}
-
-		if (gpio_is_valid(pin_no) < 0)
-		{
-			printk(KERN_INFO "gpio number invalid\n");
-			return -1;
-		}
-
-		pin = (int)pin_no;
+		pin = (unsigned int)pin_no;
 	}
 
 	if ((irq = gpio_to_irq(pin)) < 0)
 	{
-		printk(KERN_INFO "gpio mapping to irq %i failed\n", irq);
+		printk(KERN_INFO "gpio mapping to irq %u failed\n", irq);
 		return -1;
 	}
 
-	if (request_irq(irq, irq_handler, IRQF_TRIGGER_RISING, "pin_requested", DEVICE_NAME) < 0)
+	if (request_irq(irq, irq_handler, IRQF_TRIGGER_NONE, "pin", DEVICE_NAME) < 0)
 	{
-		printk(KERN_INFO "request irq %i failed\n", irq);
+		printk(KERN_INFO "request irq %u failed\n", irq);
 		return -1;
 	}
 	
+	printk(KERN_INFO "gpio %u mapped to irq %u\n", pin, irq);
 	return bytes_read;
 }
 
 irqreturn_t irq_handler(int irq, void* dev_id)
 {
-	printk(KERN_INFO "interrupt detected on pin\n", irq);
+	printk(KERN_INFO "interrupt detected on pin %u\n", pin);
+	buffer_write_uint(&dev.obuf, pin);
+	wake_up_interruptible(&wq);
 	return IRQ_HANDLED;
 }

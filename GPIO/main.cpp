@@ -7,14 +7,15 @@
 
 using namespace rpi;
 using namespace std;
+using namespace std::chrono;
 using namespace std::chrono_literals;
 using namespace std::this_thread;
 
 int main()
 {
-	constexpr auto PROGRAM_WAIT_TIME{ 20s };
-	constexpr uint32_t LED_PIN_NUMBER{ 26 };
-	constexpr uint32_t BTN_PIN_NUMBER{ 25 };
+	constexpr auto PROGRAM_WAIT_TIME{ 60s };
+	constexpr uint32_t LED_PIN_NUMBER{ 26U };
+	constexpr uint32_t BTN_PIN_NUMBER{ 25U };
 
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
 	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
@@ -35,6 +36,8 @@ int main()
 		sleep_for(100ms);
 		pinLED.write(0);
 		sleep_for(100ms);
+
+		cout << "Blink!" << endl;
 	};
 
 	// Call "blink" lambda when signal is pulled down by the button
@@ -43,8 +46,7 @@ int main()
 	cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
 	cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
 
-	// Exit ater 20 seconds
-	sleep_for(20s);
+	sleep_for(PROGRAM_WAIT_TIME);
 
     return 0;
 }

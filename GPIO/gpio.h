@@ -70,7 +70,7 @@ namespace rpi
 
 		// Set event callback.
 		template<typename _Ev, typename _Ty = _Dir>
-		__pred::__Enable_if<__pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> attach_irq_callback(callback_t callback) noexcept;
+		__pred::__Enable_if<__pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> attach_irq_callback(callback_t callback);
 
 		// Deleted methods.
 
@@ -220,7 +220,7 @@ namespace rpi
 	template<typename _Dir, typename _Reg>
 	template<typename _Ev, typename _Ty>
 	inline __pred::__Enable_if<__pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> 
-		gpio<_Dir, _Reg>::attach_irq_callback(callback_t callback) noexcept
+		gpio<_Dir, _Reg>::attach_irq_callback(callback_t callback)
 	{
 		// Get event register based on event type.
 		volatile _Reg* event_reg = __get_reg_ptr<_Reg>(__Event_reg_offs<_Reg, _Ev> + pin_number / reg_size<_Reg>);

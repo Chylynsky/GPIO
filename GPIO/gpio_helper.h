@@ -28,19 +28,11 @@ namespace rpi
 		// Constructor.
 		explicit __file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
-			if (fd < 0)
-			{
-				throw std::runtime_error("Could not open " + path + ".");
-			}
 		}
 
 		// Constructor.
 		explicit __file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
-			if (fd < 0)
-			{
-				throw std::runtime_error("Could not open " + path + ".");
-			}
 		}
 
 		// Constructor
@@ -84,18 +76,18 @@ namespace rpi
 
 		static volatile _Reg* MapMemoryAddressSpace()
 		{
-			std::unique_ptr<__file_descriptor> fd;
+			const std::string map_file = "/dev/gpiomem";
 
-			try {
-				fd = std::make_unique<__file_descriptor>("/dev/gpiomem", O_RDWR | O_SYNC);
-			}
-			catch (const std::runtime_error& e) {
-				throw e; // No '/dev/gpiomem' file
+			std::unique_ptr<__file_descriptor> fd = std::make_unique<__file_descriptor>(map_file, O_RDWR | O_SYNC);
+
+			if (*fd < 0)
+			{
+				throw std::runtime_error("Could not open " + map_file + ".");
 			}
 
 			volatile void* mapResult = 
 				static_cast<volatile void*>(mmap(
-					NULL, 
+					NULL,
 					4096, 
 					PROT_READ | PROT_WRITE, 
 					MAP_SHARED, 
@@ -119,7 +111,7 @@ namespace rpi
 	};
 
 	template<typename _Reg>
-	inline volatile _Reg* __Get_reg_ptr<_Reg>::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
+	volatile _Reg* __Get_reg_ptr<_Reg>::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
 
 	/* 
 		Global function object. Returns volatile uint32_t pointer

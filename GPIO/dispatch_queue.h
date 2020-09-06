@@ -17,13 +17,13 @@ namespace rpi
 	class __dispatch_queue
 	{
 		std::queue<_Fun> function_queue;			// Queue with functions to be executed.
-		std::thread dispatch_thread;				// Thread on which the functions are executed.
+		std::future<void> dispatch_thread;				// Thread on which the functions are executed.
 		std::mutex queue_access_mtx;				// Mutex for resource access control.
 		std::condition_variable queue_empty_cond;	// Puts the thread to sleep when no functions are in the queue.
 		std::atomic<bool> dispatch_thread_exit;		// Thread loop control.
 
 		// Method executes queued callback functions.
-		void run();
+		void execute_tasks();
 
 	public:
 
@@ -36,7 +36,7 @@ namespace rpi
 	};
 
 	template<typename _Fun>
-	void __dispatch_queue<_Fun>::run()
+	void __dispatch_queue<_Fun>::execute_tasks()
 	{
 		while (!dispatch_thread_exit)
 		{
@@ -62,7 +62,7 @@ namespace rpi
 	template<typename _Fun>
 	__dispatch_queue<_Fun>::__dispatch_queue() : dispatch_thread_exit{ false }
 	{
-		dispatch_thread = std::thread(std::bind(&__dispatch_queue::run, this));
+		dispatch_thread = std::async(std::launch::async, [this]() { execute_tasks(); });
 	}
 
 	template<typename _Fun>
@@ -75,10 +75,7 @@ namespace rpi
 		queue_empty_cond.notify_one();
 
 		// Wait for the thread to exit.
-		if (dispatch_thread.joinable())
-		{
-			dispatch_thread.join();
-		}
+		dispatch_thread.get();
 	}
 
 	template<typename _Fun>

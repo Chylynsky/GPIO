@@ -26,7 +26,7 @@ namespace rpi
 {
 	/*
 		Template class holding key - value pairs where key is the GPIO pin number
-		and value is the callback function which gets executed when specified event
+		and value is the entry function which gets executed when specified event
 		occures. Its main task is to control whether an event has occured and if so,
 		to pass it into dispatch queue.
 	*/
@@ -37,12 +37,13 @@ namespace rpi
 
 		static constexpr auto INTERRUPT_THREAD_WAIT_TIME = std::chrono::milliseconds(50);
 
-		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function.
-		std::future<void> event_poll_thread;				// Thread on which events are polled.
+		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - entry function.
+		std::future<void> event_poll_thread;		// Thread on which events are polled.
 		std::mutex event_poll_mtx;					// Mutex for resource access control.
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.
 		std::atomic<bool> event_poll_thread_exit;	// Loop control for event_poll_thread.
-		__dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding callback function is pushed here.
+		__dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding entry function is pushed here.
+		__file_descriptor driver;					// File descriptor used for driver interaction.
 
 	public:
 
@@ -55,12 +56,12 @@ namespace rpi
 		void poll_events();
 		// Insert new key-value pair.
 		void insert(std::pair<_Reg, _Fun>&& key_value_pair);
-		// Erase all callback functions for the specified pin.
+		// Erase all entry functions for the specified pin.
 		void erase(_Reg key);
 	};
 
 	template<typename _Reg, typename _Fun>
-	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
+	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }, driver{ "/dev/gpiodev", O_RDWR }
 	{
 		event_poll_thread = std::async(std::launch::async, [this]() { poll_events(); });
 	}
@@ -81,8 +82,6 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	inline void __gpio_callback_map<_Reg, _Fun>::poll_events()
 	{
-		volatile _Reg* base_event_reg = __get_reg_ptr<_Reg>(__addr::GPEDS0);
-
 		while (!event_poll_thread_exit)
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
@@ -93,18 +92,12 @@ namespace rpi
 			}
 			else
 			{
-				for (const std::pair<_Reg, _Fun>& entry : callback_map)
+				uint32_t pin;
+				lock.unlock();
+				if (read(driver, &pin, sizeof(pin)) == sizeof(pin))
 				{
-					_Reg pin_no = entry.first;
-					_Reg reg_sel = pin_no / reg_size<_Reg>;
-					_Reg event_occured = (base_event_reg[reg_sel] >> pin_no) & 1U;
-
-					if (event_occured)
-					{
-						// Clear event register.
-						*(base_event_reg + reg_sel) |= (1U << pin_no);
-						callback_queue.push(entry.second);
-					}
+					auto entry = callback_map.find(pin);
+					callback_queue.push((*entry).second);
 				}
 			}
 		}
@@ -113,9 +106,14 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	inline void __gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
 	{
+		if (write(driver, &key_val.first, sizeof(key_val.first)) < 0)
+		{
+			throw std::runtime_error("Interrupt setting failed.");
+		}
+
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
-			callback_map.insert(key_val);
+			callback_map.insert(std::move(key_val));
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
 	}
