@@ -128,7 +128,15 @@ namespace rpi
 	template<typename _Reg>
 	inline const __Get_reg_ptr<_Reg> __get_reg_ptr{};
 
-	// Get base event register offs.
+	/* 
+		Get base event register offs.
+	*/
 	template<typename _Reg, typename _Ev>
 	inline constexpr _Reg __Event_reg_offs = _Ev::offs;
+
+	template<typename _Reg>
+	inline constexpr _Reg bitmask(const _Reg n) noexcept
+	{
+		return static_cast<_Reg>(1) << n;
+	}
 }

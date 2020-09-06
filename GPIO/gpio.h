@@ -4,6 +4,10 @@
 #include <utility>
 #include <iostream>
 
+#ifndef BCM2711
+#define BCM2711
+#endif
+
 #include "gpio_direction.h"
 #include "gpio_predicates.h"
 #include "gpio_events.h"
@@ -100,7 +104,7 @@ namespace rpi
 	inline gpio<_Dir, _Reg>::gpio(uint32_t pin_number) : reg_bit_set_val{ 1U << (pin_number % reg_size<_Reg>) }, pin_number{ pin_number }
 	{
 		// Select GPIO function select register.
-		volatile uint32_t* fsel_reg = get_fsel_reg();
+		volatile _Reg* fsel_reg = get_fsel_reg();
 
 		// Each pin represented by three bits.
 		_Reg fsel_bit_shift = (3U * (pin_number % 10U));
@@ -135,15 +139,12 @@ namespace rpi
 		if constexpr (__pred::__Is_input<_Dir>)
 		{
 			_Reg reg_bit_clr_val = ~reg_bit_set_val;
-			uint32_t reg_index = pin_number / reg_size<_Reg>;
 
 			// Clear event detect bits.
-			*__get_reg_ptr<_Reg>(__addr::GPREN0 + reg_index)	&= reg_bit_clr_val;
-			*__get_reg_ptr<_Reg>(__addr::GPFEN0 + reg_index)	&= reg_bit_clr_val;
-			*__get_reg_ptr<_Reg>(__addr::GPHEN0 + reg_index)	&= reg_bit_clr_val;
-			*__get_reg_ptr<_Reg>(__addr::GPLEN0 + reg_index)	&= reg_bit_clr_val;
-			*__get_reg_ptr<_Reg>(__addr::GPAREN0 + reg_index)	&= reg_bit_clr_val;
-			*__get_reg_ptr<_Reg>(__addr::GPAFEN0 + reg_index)	&= reg_bit_clr_val;
+			for (volatile _Reg* reg : __gpio_input<_Reg>::event_regs_used)
+			{
+				*reg &= reg_bit_clr_val;
+			}
 
 			// Set pull-down resistor.
 			set_pull(pull::down);
@@ -227,6 +228,8 @@ namespace rpi
 		// Clear then set bit responsible for the selected pin.
 		*event_reg &= ~reg_bit_set_val;
 		*event_reg |= reg_bit_set_val;
+
+		__gpio_input<_Reg>::event_regs_used.push_back(event_reg);
 
 		// Add pin number - callback function pair to the callback map.
 		__gpio_input<_Reg>::callback_map.insert(std::make_pair(pin_number, callback));

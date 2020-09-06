@@ -55,7 +55,7 @@ namespace rpi
 			}
 
 			// Wait until queue is not empty or destructor is called.
-			queue_empty_cond.wait(lock, [this] { return (!function_queue.empty() || dispatch_thread_exit); });
+			queue_empty_cond.wait(lock, [this]() { return (!function_queue.empty() || dispatch_thread_exit); });
 		}
 	}
 

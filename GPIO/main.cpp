@@ -3,7 +3,6 @@
 #include <iostream>
 #include <bitset>
 
-#define BCM2711		// Processor model must be specified before including gpio.h
 #include "gpio.h"
 
 using namespace rpi;
@@ -13,15 +12,17 @@ using namespace std::this_thread;
 
 int main()
 {
+	constexpr auto PROGRAM_WAIT_TIME{ 20s };
 	constexpr uint32_t LED_PIN_NUMBER{ 26 };
 	constexpr uint32_t BTN_PIN_NUMBER{ 25 };
 
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
 	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
+
 	pinBtn.set_pull(pull::up);	// Set pull up resistor
 	
 	// Create callback lambda that makes an LED blink twice
-	auto blink = [&pinLED]
+	auto blink = [&pinLED]()
 	{
 		// First blink uses assignment operator
 		pinLED = 1;
@@ -39,11 +40,11 @@ int main()
 	// Call "blink" lambda when signal is pulled down by the button
 	pinBtn.attach_irq_callback<irq::falling_edge>(blink);
 
-	cout << "Push the button attached to pin 25 and enjoy the blinking LED!" << endl;
-	cout << "The program will exit after 60 seconds." << endl;
+	cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
+	cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
 
-	// Exit ater 60 seconds
-	sleep_for(60s);
+	// Exit ater 20 seconds
+	sleep_for(20s);
 
     return 0;
 }

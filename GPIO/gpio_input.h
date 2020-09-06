@@ -1,4 +1,5 @@
 #pragma once
+#include <list>
 #include "gpio_aliases.h"
 #include "gpio_callback_map.h"
 
@@ -13,6 +14,7 @@ namespace rpi
 	struct __gpio_input
 	{
 		static __gpio_callback_map<_Reg, callback_t> callback_map;
+		std::list<volatile _Reg*> event_regs_used;
 		volatile _Reg* lev_reg;
 	};
 

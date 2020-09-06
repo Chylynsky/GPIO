@@ -3,6 +3,7 @@
 #include <thread>
 #include <mutex>
 #include <functional>
+#include <future>
 #include <condition_variable>
 #include <utility>
 
@@ -34,8 +35,10 @@ namespace rpi
 	{
 		static_assert(__pred::__Is_integral<_Reg>, "_Reg must be of integral type.");
 
+		static constexpr auto INTERRUPT_THREAD_WAIT_TIME = std::chrono::milliseconds(50);
+
 		std::multimap<_Reg, _Fun> callback_map;		// Multimap where key - pin_number, value - callback function.
-		std::thread event_poll_thread;				// Thread on which events are polled.
+		std::future<void> event_poll_thread;				// Thread on which events are polled.
 		std::mutex event_poll_mtx;					// Mutex for resource access control.
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.
 		std::atomic<bool> event_poll_thread_exit;	// Loop control for event_poll_thread.
@@ -59,7 +62,7 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
 	{
-		event_poll_thread = std::thread(std::bind(&__gpio_callback_map<_Reg, _Fun>::poll_events, this));
+		event_poll_thread = std::async(std::launch::async, [this]() { poll_events(); });
 	}
 
 	template<typename _Reg, typename _Fun>
@@ -72,10 +75,7 @@ namespace rpi
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
 
-		if (event_poll_thread.joinable())
-		{
-			event_poll_thread.join();
-		}
+		event_poll_thread.wait_for(INTERRUPT_THREAD_WAIT_TIME);
 	}
 
 	template<typename _Reg, typename _Fun>
@@ -89,7 +89,7 @@ namespace rpi
 			if (callback_map.empty())
 			{
 				// Wait untill callback_map is not empty.
-				event_poll_cond.wait(lock, [this] { return (!callback_map.empty() || event_poll_thread_exit); });
+				event_poll_cond.wait(lock, [this]() { return (!callback_map.empty() || event_poll_thread_exit); });
 			}
 			else
 			{
@@ -97,12 +97,12 @@ namespace rpi
 				{
 					_Reg pin_no = entry.first;
 					_Reg reg_sel = pin_no / reg_size<_Reg>;
-					_Reg event_occured = (*(base_event_reg + reg_sel) >> pin_no) & 1U;
+					_Reg event_occured = (base_event_reg[reg_sel] >> pin_no) & 1U;
 
 					if (event_occured)
 					{
 						// Clear event register.
-						*(base_event_reg + reg_sel) |= 1U << pin_no;
+						*(base_event_reg + reg_sel) |= (1U << pin_no);
 						callback_queue.push(entry.second);
 					}
 				}
