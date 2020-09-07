@@ -11,13 +11,6 @@
 #include <linux/gpio.h>
 #include <linux/wait.h>
 
-/*
-* TO DO:
-* - map(?) with irq's in use
-* - thread safe resource access
-* - commands
-*/
-
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
 
@@ -28,7 +21,7 @@ MODULE_VERSION(DRIVER_VERSION);
 
 /* Dynamic data structure, to be used with buffer_* functions	*/
 struct io_buffer
-{
+{	
 	char* arr;			/* Pointer to the dynamic array			*/
 	size_t head;		/* Number of the read bytes				*/
 	size_t size;		/* Size of the memory in use			*/
@@ -49,49 +42,49 @@ typedef struct _irq_mapping* irq_mapping;
 /* gpiodev device representation */
 struct gpiodev
 {
-	dev_t dev_no;					/* Device minor and major number	*/
-	wait_queue_head_t wq;			/* Device wait queue				*/		
-	irq_mapping irq_map;			/* List with gpio-irq mapping		*/
-	struct cdev cdev;				/* Character device					*/
-	struct io_buffer ibuf;			/* Input io_buffer					*/	
-	struct io_buffer obuf;			/* Output io_buffer					*/
+	dev_t dev_no;				/* Device minor and major number	*/
+	wait_queue_head_t wq;		/* Device wait queue				*/		
+	irq_mapping irq_map;		/* List with gpio-irq mapping		*/
+	struct cdev cdev;			/* Character device					*/
+	struct io_buffer ibuf;		/* Input io_buffer					*/	
+	struct io_buffer obuf;		/* Output io_buffer					*/
 };
 
 /* 
 * Communication with the module is done by executing commands represented
-* by the command struct.
+* by the command_t struct.
 */
-struct command
+struct command_t
 {
 	unsigned char type;
 	unsigned int pin_number;
 };
 
-/* Helper macros for command struct.									 */
+/* Helper macros for command_t struct.									*/
 #define CMD_DETACH_IRQ (unsigned char)0
 #define CMD_ATTACH_IRQ (unsigned char)1
-#define CMD_CHECK_SIZE(size) (size == sizeof(struct command)) ? 1 : 0
+#define CMD_CHECK_SIZE(size) (size == sizeof(struct command_t)) ? 1 : 0
 
 /*
 	Function declarations
 */
 
-/* Module entry point 												*/
+/* Module entry point 													*/
 static int gpiodev_init(void);
 
-/* Module exit point 												*/
+/* Module exit point 													*/
 static void gpiodev_exit(void);
 
-/* Setup gpiodev structure 											*/
+/* Setup gpiodev structure 												*/
 static int gpiodev_setup(struct gpiodev* dev, const char* name);
 
-/* Destroy gpiodev structure 										*/
+/* Destroy gpiodev structure 											*/
 static void gpiodev_destroy(struct gpiodev* dev);
 
 /* Initialize io_buffer 												*/
 static void buffer_init(struct io_buffer* buf);
 
-/* Deallocate io_buffer												*/
+/* Deallocate io_buffer													*/
 static void buffer_free(struct io_buffer* buf);
 
 /* Write data to the io_buffer											*/
@@ -103,7 +96,7 @@ static ssize_t buffer_from_user(struct io_buffer* buf, const char* __user data, 
 /* Write unsigned int number to the io_buffer							*/
 static ssize_t buffer_write_uint(struct io_buffer* buf, unsigned int val);
 
-/* Write ubyte to the io_buffer							*/
+/* Write ubyte to the io_buffer											*/
 static ssize_t buffer_write_byte(struct io_buffer* buf, unsigned char val);
 
 /* Read data from the io_buffer and write it to the specified pointer	*/
@@ -121,31 +114,31 @@ static ssize_t buffer_read_byte(struct io_buffer* buf, unsigned char* dest);
 /* Reallocate io_buffer memory											*/
 static int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed);
 
-/* Initialize irq_mapping struct. */
+/* Initialize irq_mapping struct.										*/
 static void irq_mapping_init(irq_mapping* map);
 
-/* Destroy irq_mapping struct and free irqs. */
+/* Destroy irq_mapping struct and free irqs.							*/
 static void irq_mapping_destroy(irq_mapping* map);
 
-/* Request new irq, create mapping with gpio and push new node. */
+/* Request new irq, create mapping with gpio and push new node.			*/
 static int irq_mapping_push(irq_mapping* map, unsigned int gpio);
 
-/* Destroy irq mapping node based on given gpio. */
+/* Destroy irq mapping node based on given gpio.						*/
 static int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio);
 
-/* Get gpio mapped to a given irq number. */
+/* Get gpio mapped to a given irq number.								*/
 static unsigned int irq_mapping_get_gpio(irq_mapping* map, unsigned int irq);
 
-/* gpiodev 'open' file operation									*/
+/* gpiodev 'open' file operation										*/
 static int device_open(struct inode* inode, struct file* file);
 
-/* gpiodev 'release' file operation									*/
+/* gpiodev 'release' file operation										*/
 static int device_release(struct inode* inode, struct file* file);
 
-/* gpiodev 'read' file operation									*/
+/* gpiodev 'read' file operation										*/
 static ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs);
 
-/* gpiodev 'write' file operation									*/
+/* gpiodev 'write' file operation										*/
 static ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs);
 
 static irqreturn_t irq_handler(int irq, void* dev_id);
@@ -621,9 +614,9 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 	}
 
 	ssize_t bytes_read = buffer_from_user(&dev.ibuf, buff, size);
-	struct command cmd;
+	struct command_t cmd;
 
-	if (buffer_read(&dev.ibuf, sizeof(cmd), (char*)&cmd))
+	if (buffer_read(&dev.ibuf, sizeof(cmd), (char*)&cmd) != sizeof(cmd))
 	{
 		printk(KERN_INFO "unable to retrieve pin number from buffer\n");
 		return -1;
@@ -647,7 +640,7 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 			return -1;
 		}
 
-		printk(KERN_INFO "irq  freed\n");
+		printk(KERN_INFO "irq freed\n");
 		return bytes_read;
 	}
 	else

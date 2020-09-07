@@ -15,6 +15,7 @@
 #include "gpio_aliases.h"
 #include "gpio_helper.h"
 #include "dispatch_queue.h"
+#include "kernel_interop.h"
 
 #if defined(BCM2711)
 #include "bcm2711.h"
@@ -107,7 +108,9 @@ namespace rpi
 	template<typename _Reg, typename _Fun>
 	inline void __gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
 	{
-		if (write(driver, &key_val.first, sizeof(key_val.first)) < 0)
+		__kernel::command_t irq_request = { __kernel::CMD_ATTACH_IRQ, key_val.first };
+
+		if (write(driver, &irq_request, __kernel::COMMAND_SIZE) < 0)
 		{
 			throw std::runtime_error("Interrupt setting failed.");
 		}
@@ -124,6 +127,14 @@ namespace rpi
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
+
+			__kernel::command_t irq_request = { __kernel::CMD_DETACH_IRQ, key };
+
+			if (write(driver, &irq_request, __kernel::COMMAND_SIZE) < 0)
+			{
+				throw std::runtime_error("Interrupt freeing failed.");
+			}
+
 			callback_map.erase(key);
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();

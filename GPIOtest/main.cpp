@@ -3,6 +3,7 @@
 #include <iostream>
 #include <bitset>
 
+#define BCM2711
 #include "gpio.h"
 
 using namespace rpi;

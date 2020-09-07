@@ -4,10 +4,6 @@
 #include <utility>
 #include <iostream>
 
-#ifndef BCM2711
-#define BCM2711
-#endif
-
 #include "gpio_direction.h"
 #include "gpio_predicates.h"
 #include "gpio_events.h"
