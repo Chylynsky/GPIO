@@ -1,0 +1,1 @@
+g++ -o "/home/pi/projects/GPIO/GPIOtest/~/projects/GPIObuild/Debug/ARM/GPIOtest.out" -Wl,--no-undefined -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack "~/projects/GPIOobj\Debug\ARM\main.o" -lpthread

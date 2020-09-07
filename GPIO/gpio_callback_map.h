@@ -96,6 +96,7 @@ namespace rpi
 				lock.unlock();
 				if (read(driver, &pin, sizeof(pin)) == sizeof(pin))
 				{
+					lock.lock();
 					auto entry = callback_map.find(pin);
 					callback_queue.push((*entry).second);
 				}

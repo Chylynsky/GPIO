@@ -1,0 +1,9 @@
+﻿  Weryfikowanie źródeł
+  Zdalne kopiowanie źródeł do lokalizacji „raspberrypi”
+  Weryfikowanie architektury
+  Weryfikowanie architektury
+  Rozpoczynanie kompilacji zdalnej
+  Kompilowanie źródeł:
+  main.cpp
+  Łączenie obiektów
+  GPIOtest.vcxproj -> C:\Users\borch\source\repos\GPIO\GPIOtest\~/projects/GPIObuild\Debug\ARM\GPIOtest.out

@@ -166,13 +166,6 @@ namespace rpi
 	template<typename _Arg, typename _Ty>
 	inline __pred::__Enable_if<__pred::__Is_output<_Ty>, void> gpio<_Dir, _Reg>::operator=(_Arg state) noexcept
 	{
-		write(state);
-	}
-
-	template<typename _Dir, typename _Reg>
-	template<typename _Arg, typename _Ty>
-	inline __pred::__Enable_if<__pred::__Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
-	{
 		static_assert(__pred::__Is_convertible<_Arg, bool>, "Type must be convertible to bool.");
 
 		// Set '1' in SET or CLR register.
@@ -184,6 +177,13 @@ namespace rpi
 		{
 			*__gpio_output<_Reg>::set_reg |= reg_bit_set_val;
 		}
+	}
+
+	template<typename _Dir, typename _Reg>
+	template<typename _Arg, typename _Ty>
+	inline __pred::__Enable_if<__pred::__Is_output<_Ty>, void> gpio<_Dir, _Reg>::write(_Arg state) noexcept
+	{
+		*this = state;
 	}
 
 	template<typename _Dir, typename _Reg>
@@ -230,8 +230,6 @@ namespace rpi
 		*event_reg |= reg_bit_set_val;
 
 		__gpio_input<_Reg>::event_regs_used.push_back(event_reg);
-
-		// Add pin number - callback function pair to the callback map.
 		__gpio_input<_Reg>::callback_map.insert(std::make_pair(pin_number, callback));
 	}
 }
