@@ -28,16 +28,28 @@ namespace rpi
 		// Constructor.
 		explicit __file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
+			if (fd == -1)
+			{
+				throw std::runtime_error("File " + path + " could not be opened.");
+			}
 		}
 
 		// Constructor.
 		explicit __file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
 		{
+			if (fd == -1)
+			{
+				throw std::runtime_error("File " + path + " could not be opened.");
+			}
 		}
 
 		// Constructor
 		explicit __file_descriptor(int fd) : fd{ fd } 
 		{
+			if (fd == -1)
+			{
+				throw std::runtime_error("Invalid file descriptor.");
+			}
 		};
 
 		// Destructor.
@@ -56,6 +68,16 @@ namespace rpi
 		int get_fd() const noexcept
 		{
 			return fd;
+		}
+
+		ssize_t write(const void* buf, size_t size) const noexcept
+		{
+			return ::write(fd, buf, size);
+		}
+
+		ssize_t read(void* buf, size_t size) const noexcept
+		{
+			return ::read(fd, buf, size);
 		}
 
 		/*
@@ -78,11 +100,15 @@ namespace rpi
 		{
 			const std::string map_file = "/dev/gpiomem";
 
-			std::unique_ptr<__file_descriptor> fd = std::make_unique<__file_descriptor>(map_file, O_RDWR | O_SYNC);
-
-			if (*fd < 0)
+			std::unique_ptr<__file_descriptor> fd;
+			
+			try
 			{
-				throw std::runtime_error("Could not open " + map_file + ".");
+				fd = std::make_unique<__file_descriptor>(map_file, O_RDWR | O_SYNC);
+			}
+			catch (const std::runtime_error& err)
+			{
+				throw err;
 			}
 
 			volatile void* mapResult = 

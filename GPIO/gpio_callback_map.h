@@ -6,6 +6,7 @@
 #include <future>
 #include <condition_variable>
 #include <utility>
+#include <cassert>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -44,13 +45,14 @@ namespace rpi
 		std::condition_variable event_poll_cond;	// Puts the thread to sleep when callback_map is empty.
 		std::atomic<bool> event_poll_thread_exit;	// Loop control for event_poll_thread.
 		__dispatch_queue<_Fun> callback_queue;		// When an event occurs, the corresponding entry function is pushed here.
-		__file_descriptor driver;					// File descriptor used for driver interaction.
+		std::unique_ptr<__file_descriptor> driver;	// File descriptor used for driver interaction.
+
+		void request_irq(const uint32_t pin);
+		void free_irq(const uint32_t pin);
 
 	public:
 
-		// Constructor.
 		__gpio_callback_map();
-		// Destructor.
 		~__gpio_callback_map();
 
 		// Main event_poll_thread function.
@@ -62,16 +64,64 @@ namespace rpi
 	};
 
 	template<typename _Reg, typename _Fun>
-	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }, driver{ "/dev/gpiodev", O_RDWR }
+	inline void __gpio_callback_map<_Reg, _Fun>::request_irq(const uint32_t pin)
 	{
+		__kernel::command_t request{ __kernel::CMD_ATTACH_IRQ, pin };
+		ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
+
+		if (result != __kernel::COMMAND_SIZE)
+		{
+			throw std::runtime_error("IRQ request failed.");
+		}
+	}
+
+	template<typename _Reg, typename _Fun>
+	inline void __gpio_callback_map<_Reg, _Fun>::free_irq(const uint32_t pin)
+	{
+		__kernel::command_t request{ __kernel::CMD_DETACH_IRQ, pin };
+		ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
+
+		if (result != __kernel::COMMAND_SIZE)
+		{
+			throw std::runtime_error("IRQ request failed.");
+		}
+	}
+
+	template<typename _Reg, typename _Fun>
+	inline __gpio_callback_map<_Reg, _Fun>::__gpio_callback_map() : event_poll_thread_exit{ false }
+	{
+		try
+		{
+			driver = std::make_unique<__file_descriptor>("/dev/gpiodev", O_RDWR);
+		}
+		catch (const std::runtime_error& err)
+		{
+			throw err;
+		}
+
 		event_poll_thread = std::async(std::launch::async, [this]() { poll_events(); });
 	}
 
 	template<typename _Reg, typename _Fun>
 	inline __gpio_callback_map<_Reg, _Fun>::~__gpio_callback_map()
 	{
+		driver.release();
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
+
+			for (auto& entry : callback_map)
+			{
+				try 
+				{
+					free_irq(entry.first);
+				}
+				catch (const std::runtime_error& err)
+				{
+					assert(0 && "IRQ not found!");
+					continue;
+				}
+			}
+
 			callback_map.clear();
 			event_poll_thread_exit = true;
 		} // Release the lock and notify waiting thread.
@@ -94,8 +144,8 @@ namespace rpi
 			else
 			{
 				uint32_t pin;
-				lock.unlock();
-				if (read(driver, &pin, sizeof(pin)) == sizeof(pin))
+				lock.unlock(); // Allow for device release driver while waiting for data
+				if (driver->read(&pin, sizeof(pin)) == sizeof(pin))
 				{
 					lock.lock();
 					auto entry = callback_map.find(pin);
@@ -106,18 +156,23 @@ namespace rpi
 	}
 
 	template<typename _Reg, typename _Fun>
-	inline void __gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_val)
+	inline void __gpio_callback_map<_Reg, _Fun>::insert(std::pair<_Reg, _Fun>&& key_value_pair)
 	{
-		__kernel::command_t irq_request = { __kernel::CMD_ATTACH_IRQ, key_val.first };
-
-		if (write(driver, &irq_request, __kernel::COMMAND_SIZE) < 0)
-		{
-			throw std::runtime_error("Interrupt setting failed.");
-		}
-
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
-			callback_map.insert(std::move(key_val));
+
+			try
+			{
+				request_irq(key_value_pair.first);
+			}
+			catch (const std::runtime_error& err)
+			{
+				lock.unlock();
+				event_poll_cond.notify_one();
+				throw err;
+			}
+
+			callback_map.insert(std::move(key_value_pair));
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
 	}
@@ -127,15 +182,19 @@ namespace rpi
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			callback_map.erase(key);
 
-			__kernel::command_t irq_request = { __kernel::CMD_DETACH_IRQ, key };
-
-			if (write(driver, &irq_request, __kernel::COMMAND_SIZE) < 0)
+			try
 			{
-				throw std::runtime_error("Interrupt freeing failed.");
+				free_irq(key);
+			}
+			catch (const std::runtime_error& err)
+			{
+				lock.unlock();
+				event_poll_cond.notify_one();
+				throw err;
 			}
 
-			callback_map.erase(key);
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
 	}

@@ -533,6 +533,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 	if (curr->gpio == gpio)
 	{
 		free_irq(curr->irq, DEVICE_NAME);
+		printk(KERN_INFO "irq %u freed\n", curr->irq);
 		kfree(curr);
 		*map = next;
 
@@ -548,6 +549,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 		if (curr->gpio == gpio)
 		{
 			free_irq(curr->irq, DEVICE_NAME);
+			printk(KERN_INFO "irq %u freed\n", curr->irq);
 			kfree(curr);
 			prev->next = next;
 			return 0;
@@ -640,7 +642,6 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 			return -1;
 		}
 
-		printk(KERN_INFO "irq freed\n");
 		return bytes_read;
 	}
 	else
