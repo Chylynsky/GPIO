@@ -14,13 +14,10 @@ namespace rpi
 		execution on a seperate thread.
 	*/
 	template<typename _Fun>
-	class __dispatch_queue
+	class __dispatch_queue : private std::queue<_Fun>
 	{
-		std::queue<_Fun> function_queue;			// Queue with functions to be executed.
-		std::future<void> dispatch_thread;				// Thread on which the functions are executed.
+		std::future<void> dispatch_thread;			// Thread on which the functions are executed.
 		std::mutex queue_access_mtx;				// Mutex for resource access control.
-		std::condition_variable queue_empty_cond;	// Puts the thread to sleep when no functions are in the queue.
-		std::atomic<bool> dispatch_thread_exit;		// Thread loop control.
 
 		// Method executes queued callback functions.
 		void execute_tasks();
@@ -36,55 +33,47 @@ namespace rpi
 	};
 
 	template<typename _Fun>
-	void __dispatch_queue<_Fun>::execute_tasks()
+	inline void __dispatch_queue<_Fun>::execute_tasks()
 	{
-		while (!dispatch_thread_exit)
+		std::unique_lock<std::mutex> lock(queue_access_mtx);
+
+		// Execute all functions
+		while (!std::queue<_Fun>::empty())
 		{
-			std::unique_lock<std::mutex> lock(queue_access_mtx);
+			auto fun = std::queue<_Fun>::front();
 
-			// Execute all functions
-			while (!function_queue.empty())
-			{
-				_Fun fun = function_queue.front();
-				
-				lock.unlock();	// Unlock the mutex while the callback is being executed.
-				fun();			// Execute the callback function.
-				lock.lock();	// Lock again.
+			lock.unlock();	// Unlock the mutex while the callback is being executed.
+			fun();			// Execute the callback function.
+			lock.lock();	// Lock again.
 
-				function_queue.pop();
-			}
-
-			// Wait until queue is not empty or destructor is called.
-			queue_empty_cond.wait(lock, [this]() { return (!function_queue.empty() || dispatch_thread_exit); });
+			std::queue<_Fun>::pop();
 		}
 	}
 
 	template<typename _Fun>
-	__dispatch_queue<_Fun>::__dispatch_queue() : dispatch_thread_exit{ false }
+	inline __dispatch_queue<_Fun>::__dispatch_queue() : dispatch_thread{}
 	{
-		dispatch_thread = std::async(std::launch::async, [this]() { execute_tasks(); });
 	}
 
 	template<typename _Fun>
-	__dispatch_queue<_Fun>::~__dispatch_queue()
+	inline __dispatch_queue<_Fun>::~__dispatch_queue()
 	{
+		if (dispatch_thread.valid())
 		{
-			std::unique_lock<std::mutex> lock(queue_access_mtx);
-			dispatch_thread_exit = true;
-		} // Release the mutex and notify wating thread.
-		queue_empty_cond.notify_one();
-
-		// Wait for the thread to exit.
-		dispatch_thread.get();
+			dispatch_thread.wait();
+		}
 	}
 
 	template<typename _Fun>
-	void __dispatch_queue<_Fun>::push(const _Fun& fun)
+	inline void __dispatch_queue<_Fun>::push(const _Fun& fun)
 	{
+		std::unique_lock<std::mutex> lock(queue_access_mtx);
+
+		if (std::queue<_Fun>::empty())
 		{
-			std::unique_lock<std::mutex> lock(queue_access_mtx);
-			function_queue.push(fun);
-		} // Release the mutex and notify wating thread.
-		queue_empty_cond.notify_one();
+			dispatch_thread = std::async(std::launch::async, [this]() { execute_tasks(); });
+		}
+
+		std::queue<_Fun>::push(fun);
 	}
 }

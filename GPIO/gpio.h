@@ -134,6 +134,8 @@ namespace rpi
 		// Enable only when instantiated with input template parameter.
 		if constexpr (__pred::__Is_input<_Dir>)
 		{
+			__gpio_input<_Reg>::irq_controller.erase(pin_number);
+
 			_Reg reg_bit_clr_val = ~reg_bit_set_val;
 
 			// Clear event detect bits.
@@ -144,8 +146,6 @@ namespace rpi
 
 			// Set pull-down resistor.
 			set_pull(pull::down);
-
-			__gpio_input<_Reg>::callback_map.erase(pin_number);
 		}
 
 		// Enable only when instantiated with output template parameter.
@@ -223,7 +223,7 @@ namespace rpi
 
 		try
 		{
-			__gpio_input<_Reg>::callback_map.insert(std::make_pair(pin_number, callback));
+			__gpio_input<_Reg>::irq_controller.insert(pin_number, callback);
 		}
 		catch (const std::runtime_error& err)
 		{

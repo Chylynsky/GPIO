@@ -654,6 +654,7 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 irqreturn_t irq_handler(int irq, void* dev_id)
 {
 	buffer_write_uint(&dev.obuf, irq_mapping_get_gpio(&dev.irq_map, irq));
+	printk(KERN_INFO "irq %i triggered\n", irq);
 	wake_up_interruptible(&dev.wq);
 	return IRQ_HANDLED;
 }
