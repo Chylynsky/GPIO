@@ -1,8 +1,8 @@
 # Visual Studio directories
-/.vs
-*/obj
-*/bin
-*/readme
+.vs
+obj
+bin
+build
 
 # Visual Studio files
 *.sln
@@ -10,5 +10,4 @@
 *.vcxproj.user
 
 # Common
-*/transfer_files.bat
-/build
+transfer_files.bat
