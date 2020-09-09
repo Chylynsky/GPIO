@@ -3,6 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <mutex>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -21,6 +22,7 @@ namespace rpi
 	*/
 	class __file_descriptor
 	{
+		mutable std::mutex mtx;
 		const int fd; // File descriptor.
 
 	public:
@@ -55,11 +57,12 @@ namespace rpi
 		// Destructor.
 		~__file_descriptor()
 		{
+			std::unique_lock<std::mutex> lock{ mtx };
 			close(fd);
 		}
 
 		// Implicit conversion to int.
-		operator int()
+		operator int() const noexcept
 		{
 			return fd;
 		}
@@ -72,11 +75,13 @@ namespace rpi
 
 		ssize_t write(const void* buf, size_t size) const noexcept
 		{
+			std::unique_lock<std::mutex> lock{ mtx };
 			return ::write(fd, buf, size);
 		}
 
 		ssize_t read(void* buf, size_t size) const noexcept
 		{
+			std::unique_lock<std::mutex> lock{ mtx };
 			return ::read(fd, buf, size);
 		}
 
@@ -151,10 +156,4 @@ namespace rpi
 	*/
 	template<typename _Reg, typename _Ev>
 	inline constexpr _Reg __Event_reg_offs = _Ev::offs;
-
-	template<typename _Reg>
-	inline constexpr _Reg bitmask(const _Reg n) noexcept
-	{
-		return static_cast<_Reg>(1) << n;
-	}
 }

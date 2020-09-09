@@ -3,7 +3,7 @@
 #include <exception>
 #include <stdexcept>
 #include "kernel_interop.h"
-#include "gpio_callback_map.h"
+#include "gpio_irq_controller.h"
 
 namespace rpi
 {
@@ -29,7 +29,9 @@ namespace rpi
 		}
 	}
 
-	__irq_controller::__irq_controller() : event_poll_thread_exit{ false }
+	__irq_controller::__irq_controller() :
+		event_poll_thread_exit{ false },
+		callback_queue{ std::make_unique<__dispatch_queue<callback_t>>() }
 	{
 		try
 		{
@@ -45,11 +47,14 @@ namespace rpi
 
 	__irq_controller::~__irq_controller()
 	{
-		driver.release();
-		{
-			std::unique_lock<std::mutex> lock(event_poll_mtx);
+		event_poll_thread_exit = true;
+		driver.reset();
 
-			for (auto& entry : irq_controller)
+		{
+			std::unique_lock<std::mutex> lock{ event_poll_mtx };
+			callback_queue.reset();	// Make callback queue empty to avoid calling a dangling reference to a function object
+
+			for (auto& entry : callback_map)
 			{
 				try
 				{
@@ -62,12 +67,11 @@ namespace rpi
 				}
 			}
 
-			irq_controller.clear();
-			event_poll_thread_exit = true;
-		} // Release the lock and notify waiting thread.
-		event_poll_cond.notify_one();
+			callback_map.clear();
+		}
 
-		event_poll_thread.get();
+		event_poll_cond.notify_one();
+		event_poll_thread.wait();
 	}
 
 	void __irq_controller::poll_events()
@@ -75,20 +79,20 @@ namespace rpi
 		while (!event_poll_thread_exit)
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
-			if (irq_controller.empty())
+			if (callback_map.empty())
 			{
 				// Wait untill irq_controller is not empty.
-				event_poll_cond.wait(lock, [this]() { return (!irq_controller.empty() || event_poll_thread_exit); });
+				event_poll_cond.wait(lock, [this]() { return (!callback_map.empty() || event_poll_thread_exit); });
 			}
 			else
 			{
+				lock.unlock();
 				uint32_t pin;
-				lock.unlock(); // Allow for device release driver while waiting for data
-				if (driver->read(&pin, sizeof(pin)) == sizeof(pin))
+				if ((bytes_read = driver->read(&pin, sizeof(pin))) == sizeof(pin))
 				{
 					lock.lock();
-					auto entry = irq_controller.find(pin);
-					callback_queue.push((*entry).second);
+					auto entry = callback_map.find(pin);
+					callback_queue->push((*entry).second);
 				}
 			}
 		}
@@ -98,41 +102,35 @@ namespace rpi
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
-
-			try
-			{
-				request_irq(pin);
-			}
-			catch (const std::runtime_error& err)
-			{
-				lock.unlock();
-				event_poll_cond.notify_one();
-				throw err;
-			}
-
-			irq_controller.insert(std::move(std::make_pair(pin, callback)));
+			callback_map.insert(std::move(std::make_pair(pin, callback)));
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
+
+		try
+		{
+			request_irq(pin);
+		}
+		catch (const std::runtime_error& err)
+		{
+			throw err;
+		}
 	}
 
 	void __irq_controller::erase(uint32_t key)
 	{
 		{
 			std::unique_lock<std::mutex> lock(event_poll_mtx);
-			irq_controller.erase(key);
-
-			try
-			{
-				free_irq(key);
-			}
-			catch (const std::runtime_error& err)
-			{
-				lock.unlock();
-				event_poll_cond.notify_one();
-				throw err;
-			}
-
+			callback_map.erase(key);
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
+
+		try
+		{
+			free_irq(key);
+		}
+		catch (const std::runtime_error& err)
+		{
+			throw err;
+		}
 	}
 }

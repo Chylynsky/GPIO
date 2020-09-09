@@ -2,7 +2,7 @@
 #include <cstdint>
 #include <stdexcept>
 #include <utility>
-#include <iostream>
+#include <memory>
 
 #include "gpio_direction.h"
 #include "gpio_predicates.h"
@@ -134,14 +134,20 @@ namespace rpi
 		// Enable only when instantiated with input template parameter.
 		if constexpr (__pred::__Is_input<_Dir>)
 		{
-			__gpio_input<_Reg>::irq_controller.erase(pin_number);
-
 			_Reg reg_bit_clr_val = ~reg_bit_set_val;
 
 			// Clear event detect bits.
 			for (volatile _Reg* reg : __gpio_input<_Reg>::event_regs_used)
 			{
 				*reg &= reg_bit_clr_val;
+				__gpio_input<_Reg>::irqs_set--;
+			}
+
+			__gpio_input<_Reg>::irq_controller->erase(pin_number);
+
+			if (__gpio_input<_Reg>::irqs_set == 0U)
+			{
+				__gpio_input<_Reg>::irq_controller.reset();
 			}
 
 			// Set pull-down resistor.
@@ -221,14 +227,21 @@ namespace rpi
 		// Get event register based on event type.
 		volatile _Reg* event_reg = __get_reg_ptr<_Reg>(__Event_reg_offs<_Reg, _Ev> + pin_number / reg_size<_Reg>);
 
+		if (__gpio_input<_Reg>::irqs_set == 0U)
+		{
+			__gpio_input<_Reg>::irq_controller = std::make_unique<__irq_controller>();
+		}
+
 		try
 		{
-			__gpio_input<_Reg>::irq_controller.insert(pin_number, callback);
+			__gpio_input<_Reg>::irq_controller->insert(pin_number, callback);
 		}
 		catch (const std::runtime_error& err)
 		{
 			throw err;
 		}
+
+		__gpio_input<_Reg>::irqs_set++;
 
 		// Clear then set bit responsible for the selected pin.
 		*event_reg &= ~reg_bit_set_val;

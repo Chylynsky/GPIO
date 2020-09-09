@@ -14,14 +14,11 @@ using namespace std::this_thread;
 
 int main()
 {
-	constexpr auto PROGRAM_WAIT_TIME{ 3s };
+	constexpr auto PROGRAM_WAIT_TIME{ 60s };
 	constexpr uint32_t LED_PIN_NUMBER{ 26U };
 	constexpr uint32_t BTN_PIN_NUMBER{ 25U };
 
 	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
-	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
-
-	pinBtn.set_pull(pull::up);	// Set pull up resistor
 
 	// Create callback lambda that makes an LED blink twice
 	auto blink = [&pinLED]()
@@ -40,6 +37,11 @@ int main()
 
 		cout << "Blink!" << endl;
 	};
+
+	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
+
+	pinBtn.set_pull(pull::up);	// Set pull up resistor
+
 	// Call "blink" lambda when signal is pulled down by the button
 	pinBtn.attach_irq_callback<irq::falling_edge>(blink);
 
