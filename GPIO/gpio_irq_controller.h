@@ -35,6 +35,7 @@ namespace rpi
 
 		void request_irq(const uint32_t pin);
 		void free_irq(const uint32_t pin);
+		void wake_driver();
 
 	public:
 

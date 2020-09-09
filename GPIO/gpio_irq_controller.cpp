@@ -29,6 +29,17 @@ namespace rpi
 		}
 	}
 
+	void __irq_controller::wake_driver()
+	{
+		__kernel::command_t request{ __kernel::CMD_WAKE_UP, 0xFFFFU };
+		ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
+
+		if (result != __kernel::COMMAND_SIZE)
+		{
+			throw std::runtime_error("IRQ request failed.");
+		}
+	}
+
 	__irq_controller::__irq_controller() :
 		event_poll_thread_exit{ false },
 		callback_queue{ std::make_unique<__dispatch_queue<callback_t>>() }
@@ -48,7 +59,7 @@ namespace rpi
 	__irq_controller::~__irq_controller()
 	{
 		event_poll_thread_exit = true;
-		driver.reset();
+		wake_driver();
 
 		{
 			std::unique_lock<std::mutex> lock{ event_poll_mtx };
@@ -88,7 +99,7 @@ namespace rpi
 			{
 				lock.unlock();
 				uint32_t pin;
-				if ((bytes_read = driver->read(&pin, sizeof(pin))) == sizeof(pin))
+				if (driver->read(&pin, sizeof(pin)) == sizeof(pin))
 				{
 					lock.lock();
 					auto entry = callback_map.find(pin);

@@ -56,13 +56,14 @@ struct gpiodev
 */
 struct command_t
 {
-	unsigned char type;
+	unsigned int type;
 	unsigned int pin_number;
 };
 
 /* Helper macros for command_t struct.									*/
 #define CMD_DETACH_IRQ (unsigned char)0
 #define CMD_ATTACH_IRQ (unsigned char)1
+#define CMD_WAKE_UP (unsigned char)2
 #define CMD_CHECK_SIZE(size) (size == sizeof(struct command_t)) ? 1 : 0
 
 /*
@@ -599,7 +600,7 @@ ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* o
 
 	if (dev.obuf.size == 0U)
 	{
-		wait_event_interruptible_timeout(dev.wq, dev.obuf.size != 0U, 100);
+		wait_event_interruptible(dev.wq, dev.obuf.size != 0U);
 	}
 
 	return buffer_to_user(&dev.obuf, size, buff);
@@ -642,6 +643,12 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 			return -1;
 		}
 
+		return bytes_read;
+	}
+	else if (cmd.type == CMD_WAKE_UP)
+	{
+		printk(KERN_INFO "woken up\n");
+		wake_up_interruptible(&dev.wq);
 		return bytes_read;
 	}
 	else

@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
-#include <mutex>
+#include <shared_mutex>
 
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -22,7 +22,7 @@ namespace rpi
 	*/
 	class __file_descriptor
 	{
-		mutable std::mutex mtx;
+		mutable std::shared_mutex mtx;
 		const int fd; // File descriptor.
 
 	public:
@@ -57,7 +57,7 @@ namespace rpi
 		// Destructor.
 		~__file_descriptor()
 		{
-			std::unique_lock<std::mutex> lock{ mtx };
+			std::unique_lock<std::shared_mutex> lock{ mtx };
 			close(fd);
 		}
 
@@ -75,13 +75,13 @@ namespace rpi
 
 		ssize_t write(const void* buf, size_t size) const noexcept
 		{
-			std::unique_lock<std::mutex> lock{ mtx };
+			std::shared_lock<std::shared_mutex> lock{ mtx };
 			return ::write(fd, buf, size);
 		}
 
 		ssize_t read(void* buf, size_t size) const noexcept
 		{
-			std::unique_lock<std::mutex> lock{ mtx };
+			std::shared_lock<std::shared_mutex> lock{ mtx };
 			return ::read(fd, buf, size);
 		}
 

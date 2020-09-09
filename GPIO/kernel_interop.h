@@ -4,11 +4,12 @@ namespace rpi::__kernel
 {
 	struct command_t
 	{
-		unsigned char type;
-		unsigned int pin_number;
+		uint32_t type;
+		uint32_t pin_number;
 	};
 
-	inline constexpr unsigned char CMD_DETACH_IRQ = static_cast<unsigned char>(0);
-	inline constexpr unsigned char CMD_ATTACH_IRQ = static_cast<unsigned char>(1);
-	inline constexpr int COMMAND_SIZE = sizeof(command_t);
+	inline constexpr uint32_t	CMD_DETACH_IRQ	= 0U;
+	inline constexpr uint32_t	CMD_ATTACH_IRQ	= 1U;
+	inline constexpr uint32_t	CMD_WAKE_UP		= 2U;
+	inline constexpr size_t		COMMAND_SIZE	= sizeof(command_t);
 }
