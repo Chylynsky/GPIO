@@ -59,60 +59,65 @@ namespace rpi
 	__irq_controller::~__irq_controller()
 	{
 		event_poll_thread_exit = true;
+		event_poll_cond.notify_one();
 		wake_driver();
+		event_poll_thread.wait();
+		callback_queue.reset();	// Destroy callback queue to avoid calling a dangling reference to a function object
 
+		for (auto& entry : callback_map)
 		{
-			std::unique_lock<std::mutex> lock{ event_poll_mtx };
-			callback_queue.reset();	// Make callback queue empty to avoid calling a dangling reference to a function object
-
-			for (auto& entry : callback_map)
+			try
 			{
-				try
-				{
-					free_irq(entry.first);
-				}
-				catch (const std::runtime_error& err)
-				{
-					assert(0 && "IRQ not found!");
-					continue;
-				}
+				free_irq(entry.first);
 			}
-
-			callback_map.clear();
+			catch (const std::runtime_error& err)
+			{
+				assert(0 && "IRQ not found!");
+				continue;
+			}
 		}
 
-		event_poll_cond.notify_one();
-		event_poll_thread.wait();
+		callback_map.clear();
 	}
 
 	void __irq_controller::poll_events()
 	{
 		while (!event_poll_thread_exit)
 		{
-			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			std::unique_lock<std::mutex> lock{ event_poll_mtx };
 			if (callback_map.empty())
 			{
 				// Wait untill irq_controller is not empty.
 				event_poll_cond.wait(lock, [this]() { return (!callback_map.empty() || event_poll_thread_exit); });
+				continue;
 			}
-			else
+
+			lock.unlock();
+			uint32_t pin;
+
+			if (driver->read(&pin, sizeof(pin)) != sizeof(pin))
+			{
+				continue;
+			}
+
+			lock.lock();
+			auto entry = callback_map.find(pin);
+
+			if (entry != callback_map.end())
 			{
 				lock.unlock();
-				uint32_t pin;
-				if (driver->read(&pin, sizeof(pin)) == sizeof(pin))
-				{
-					lock.lock();
-					auto entry = callback_map.find(pin);
-					callback_queue->push((*entry).second);
-				}
+				callback_queue->push((*entry).second);
+				continue;
 			}
+
+			lock.unlock();
 		}
 	}
 
 	void __irq_controller::insert(uint32_t pin, const callback_t& callback)
 	{
 		{
-			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			std::lock_guard<std::mutex> lock{ event_poll_mtx };
 			callback_map.insert(std::move(std::make_pair(pin, callback)));
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();
@@ -130,7 +135,7 @@ namespace rpi
 	void __irq_controller::erase(uint32_t key)
 	{
 		{
-			std::unique_lock<std::mutex> lock(event_poll_mtx);
+			std::lock_guard<std::mutex> lock{ event_poll_mtx };
 			callback_map.erase(key);
 		} // Release the lock and notify waiting thread.
 		event_poll_cond.notify_one();

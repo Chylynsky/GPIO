@@ -10,6 +10,7 @@
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
 #include <linux/wait.h>
+#include <linux/spinlock.h>
 
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
@@ -61,9 +62,9 @@ struct command_t
 };
 
 /* Helper macros for command_t struct.									*/
-#define CMD_DETACH_IRQ (unsigned char)0
-#define CMD_ATTACH_IRQ (unsigned char)1
-#define CMD_WAKE_UP (unsigned char)2
+#define CMD_DETACH_IRQ	(unsigned int)0
+#define CMD_ATTACH_IRQ	(unsigned int)1
+#define CMD_WAKE_UP		(unsigned int)2
 #define CMD_CHECK_SIZE(size) (size == sizeof(struct command_t)) ? 1 : 0
 
 /*
@@ -150,6 +151,8 @@ static irqreturn_t irq_handler(int irq, void* dev_id);
 
 /* gpiodev instance */
 static struct gpiodev dev;
+
+static DEFINE_SPINLOCK(lock);
 
 /* File operations function pointers assignments */
 static struct file_operations gpiodev_fops = {
@@ -247,6 +250,7 @@ void buffer_free(struct io_buffer* buf)
 
 ssize_t buffer_write(struct io_buffer* buf, const char* data, size_t size)
 {
+
 	/*
 		Size of the data to write summed with number of unread bytes
 		should be less or equal the io_buffer's capacity
@@ -284,7 +288,7 @@ ssize_t buffer_from_user(struct io_buffer* buf, const char* __user data, size_t 
 	}
 
 	/* Copy data to io_buffer */
-	unsigned long bytes_not_copied = copy_from_user((void*)&buf->arr[buf->head + buf->size], (const void*)data, (unsigned long)size);
+	unsigned long bytes_not_copied = copy_from_user((void*)(&(buf->arr[buf->head + buf->size])), (const void*)data, (unsigned long)size);
 	unsigned long bytes_copied = size - bytes_not_copied;
 	buf->size += bytes_copied;
 
@@ -300,7 +304,7 @@ ssize_t buffer_write_uint(struct io_buffer* buf, unsigned int val)
 		return -1;
 	}
 
-	*((unsigned int*)&buf->arr[buf->head]) = val;
+	*((unsigned int*)(&(buf->arr[buf->head + buf->size]))) = val;
 	buf->size += sizeof(unsigned int);
 
 	return 0;
@@ -314,7 +318,7 @@ ssize_t buffer_write_byte(struct io_buffer* buf, unsigned char val)
 		return -1;
 	}
 
-	*((unsigned char*)&buf->arr[buf->head]) = val;
+	*((unsigned char*)(&(buf->arr[buf->head + buf->size]))) = val;
 	buf->size += sizeof(unsigned char);
 
 	return 0;
@@ -355,9 +359,9 @@ ssize_t buffer_to_user(struct io_buffer* buf, size_t size, char* __user dest)
 	/* Size of data to be read						*/
 	const ssize_t bytes_to_copy = (buf->size > size) ? size : buf->size;
 	/* Number of bytes that could not be read		*/
-	const ssize_t bytes_not_copied = (ssize_t)copy_to_user((void*)dest, (const void*)&buf->arr[buf->head], (unsigned long)bytes_to_copy);
+	const ssize_t bytes_not_copied = (ssize_t)copy_to_user((void*)dest, (const void*)(&(buf->arr[buf->head])), (unsigned long)bytes_to_copy);
 	/* Bytes copied to dest							*/
-	const ssize_t bytes_copied = size - bytes_not_copied;
+	const ssize_t bytes_copied = bytes_to_copy - bytes_not_copied;
 	/* Set new io_buffer size							*/
 	buf->size -= bytes_copied;
 	/* Move head									*/
@@ -401,7 +405,7 @@ ssize_t buffer_read_byte(struct io_buffer* buf, unsigned char* dest)
 		return -1;
 	}
 
-	*dest = *((unsigned char*)(&buf->arr[buf->head]));
+	*dest = *((unsigned char*)(&(buf->arr[buf->head])));
 
 	buf->head += sizeof(unsigned char);
 	buf->size -= sizeof(unsigned char);
@@ -418,16 +422,18 @@ ssize_t buffer_read_byte(struct io_buffer* buf, unsigned char* dest)
 int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed)
 {
 	const size_t unread_bytes = buf->size;
-	const size_t space_left = buf->capacity - buf->head + unread_bytes;
+	const size_t space_left = buf->capacity - buf->head - buf->size;
+
+	printk(KERN_INFO "unread bytes: %u, space left: %u\n", unread_bytes, space_left);
 
 	/*
 		Resize if data can't fit in the space left
 	*/
 	if (space_left < size_needed)
 	{
-		const size_t requested_size = unread_bytes + size_needed;
+		const size_t requested_size = 4U * (unread_bytes + size_needed) * sizeof(char);
 		/* Allocate more memory and assign it to temporary pointer */
-		char* tmp = (char*)kmalloc(requested_size * sizeof(char), GFP_KERNEL);
+		char* tmp = (char*)kmalloc(requested_size, GFP_KERNEL);
 
 		if (tmp == NULL)
 		{
@@ -444,7 +450,7 @@ int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed)
 		}
 
 		kfree((void*)buf->arr);				/* Deallocate old memory				*/
-		buf->arr		= tmp;				/* Assign new memory to the io_buffer		*/
+		buf->arr		= tmp;				/* Assign new memory to the io_buffer	*/
 		buf->head		= 0U;				/* Reset head							*/
 		buf->size		= unread_bytes;		/* Set new size							*/
 		buf->capacity	= requested_size;	/* Set new capacity						*/
@@ -576,6 +582,7 @@ unsigned int irq_mapping_get_gpio(irq_mapping* map, unsigned int irq)
 
 		if (curr->irq == irq)
 		{
+			printk(KERN_INFO "irq_mapping_get_gpio returned %u\n", curr->gpio);
 			return curr->gpio;
 		}
 	}
@@ -603,7 +610,19 @@ ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* o
 		wait_event_interruptible(dev.wq, dev.obuf.size != 0U);
 	}
 
-	return buffer_to_user(&dev.obuf, size, buff);
+	/*
+	*	Lock the same spinlock as the interrupt handler. Iterrupt
+	*	handler passes interrupted gpio number to the device output buffer.
+	*/
+
+	spin_lock(&lock);
+
+	printk(KERN_INFO "value %u copied to user\n", *((unsigned int*)(&dev.obuf.arr[dev.obuf.head])));
+	ssize_t result =  buffer_to_user(&dev.obuf, size, buff);
+
+	spin_unlock(&lock);
+
+	return result;
 }
 
 ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs)
@@ -660,8 +679,14 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 
 irqreturn_t irq_handler(int irq, void* dev_id)
 {
-	buffer_write_uint(&dev.obuf, irq_mapping_get_gpio(&dev.irq_map, irq));
 	printk(KERN_INFO "irq %i triggered\n", irq);
+	unsigned int flags;
+
+	spin_lock_irqsave(&lock, flags);
+	buffer_write_uint(&dev.obuf, irq_mapping_get_gpio(&dev.irq_map, irq));
+	spin_unlock_irqrestore(&lock, flags);
+
 	wake_up_interruptible(&dev.wq);
+
 	return IRQ_HANDLED;
 }

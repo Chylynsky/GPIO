@@ -35,18 +35,15 @@ namespace rpi
 	template<typename _Fun>
 	inline void __dispatch_queue<_Fun>::execute_tasks()
 	{
-		std::unique_lock<std::mutex> lock(queue_access_mtx);
+		std::unique_lock<std::mutex> lock{ queue_access_mtx };
 
-		// Execute all functions
 		while (!std::queue<_Fun>::empty())
 		{
-			auto fun = std::queue<_Fun>::front();
+			const _Fun& fun = (*this).front();
+			(*this).pop();
 
 			lock.unlock();	// Unlock the mutex while the callback is being executed.
 			fun();			// Execute the callback function.
-			lock.lock();	// Lock again.
-
-			std::queue<_Fun>::pop();
 		}
 	}
 
@@ -58,6 +55,15 @@ namespace rpi
 	template<typename _Fun>
 	inline __dispatch_queue<_Fun>::~__dispatch_queue()
 	{
+		{
+			std::lock_guard<std::mutex> lock{ queue_access_mtx };
+
+			while (!(*this).empty())
+			{
+				(*this).pop();
+			}
+		}
+
 		if (dispatch_thread.valid())
 		{
 			dispatch_thread.wait();
@@ -67,9 +73,9 @@ namespace rpi
 	template<typename _Fun>
 	inline void __dispatch_queue<_Fun>::push(const _Fun& fun)
 	{
-		std::unique_lock<std::mutex> lock(queue_access_mtx);
+		std::lock_guard<std::mutex> lock(queue_access_mtx);
 
-		if (std::queue<_Fun>::empty())
+		if ((*this).empty())
 		{
 			dispatch_thread = std::async(std::launch::async, [this]() { execute_tasks(); });
 		}
