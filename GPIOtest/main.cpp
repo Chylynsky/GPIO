@@ -14,39 +14,39 @@ using namespace std::this_thread;
 
 int main()
 {
-	constexpr auto PROGRAM_WAIT_TIME{ 60s };
-	constexpr uint32_t LED_PIN_NUMBER{ 26U };
-	constexpr uint32_t BTN_PIN_NUMBER{ 25U };
+    constexpr auto PROGRAM_WAIT_TIME{ 60s };
+    constexpr uint32_t LED_PIN_NUMBER{ 26U };
+    constexpr uint32_t BTN_PIN_NUMBER{ 25U };
 
-	gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
+    gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
 
-	// Create callback lambda that makes an LED blink twice
-	auto blink = [&pinLED]()
-	{
-		// First blink uses assignment operator
-		pinLED = 1;
-		sleep_for(100ms);
-		pinLED = 0;
-		sleep_for(100ms);
+    // Create callback lambda that makes an LED blink twice
+    auto blink = [&pinLED]()
+    {
+        // First blink uses assignment operator
+        pinLED = 1;
+        sleep_for(100ms);
+        pinLED = 0;
+        sleep_for(100ms);
 
-		// Second blink uses write function
-		pinLED.write(1);
-		sleep_for(100ms);
-		pinLED.write(0);
-		sleep_for(100ms);
+        // Second blink uses write function
+        pinLED.write(1);
+        sleep_for(100ms);
+        pinLED.write(0);
+        sleep_for(100ms);
 
-		cout << "Blink!" << endl;
-	};
+        cout << "Blink!" << endl;
+    };
 
-	gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
+    gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
 
-	pinBtn.set_pull(pull::up);	// Set pull up resistor
+    pinBtn.set_pull(pull::up);	// Set pull up resistor
 
-	// Call "blink" lambda when signal is pulled down by the button
-	pinBtn.attach_irq_callback<irq::falling_edge>(blink);
+    // Call "blink" lambda when signal is pulled down by the button
+    pinBtn.attach_irq_callback<irq::falling_edge>(blink);
 
-	cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
-	cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
+    cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
+    cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
 
-	return 0;
+    return 0;
 }

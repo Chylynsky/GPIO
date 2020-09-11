@@ -2,11 +2,11 @@
 
 namespace rpi::dir
 {
-	struct input
-	{
-	};
+    struct input
+    {
+    };
 
-	struct output
-	{
-	};
+    struct output
+    {
+    };
 }
