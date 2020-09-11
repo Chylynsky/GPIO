@@ -48,5 +48,7 @@ int main()
     cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
     cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
 
+    sleep_for(PROGRAM_WAIT_TIME);
+
     return 0;
 }

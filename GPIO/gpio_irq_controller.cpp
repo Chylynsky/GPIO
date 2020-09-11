@@ -7,7 +7,7 @@
 
 namespace rpi
 {
-    void __irq_controller::request_irq(const uint32_t pin)
+    void __irq_controller::kernel_request_irq(const uint32_t pin)
     {
         __kernel::command_t request{ __kernel::CMD_ATTACH_IRQ, pin };
         ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
@@ -18,7 +18,7 @@ namespace rpi
         }
     }
 
-    void __irq_controller::free_irq(const uint32_t pin)
+    void __irq_controller::kernel_irq_free(const uint32_t pin)
     {
         __kernel::command_t request{ __kernel::CMD_DETACH_IRQ, pin };
         ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
@@ -29,7 +29,7 @@ namespace rpi
         }
     }
 
-    void __irq_controller::wake_driver()
+    void __irq_controller::kernel_read_unblock()
     {
         __kernel::command_t request{ __kernel::CMD_WAKE_UP, 0xFFFFU };
         ssize_t result = driver->write(&request, __kernel::COMMAND_SIZE);
@@ -60,7 +60,7 @@ namespace rpi
     {
         event_poll_thread_exit = true;
         event_poll_cond.notify_one();
-        wake_driver();
+        kernel_read_unblock();
         event_poll_thread.wait();
         callback_queue.reset();	// Destroy callback queue to avoid calling a dangling reference to a function object
 
@@ -68,7 +68,7 @@ namespace rpi
         {
             try
             {
-                free_irq(entry.first);
+                kernel_irq_free(entry.first);
             }
             catch (const std::runtime_error& err)
             {
@@ -82,6 +82,8 @@ namespace rpi
 
     void __irq_controller::poll_events()
     {
+        uint32_t pin = 0U;
+
         while (!event_poll_thread_exit)
         {
             std::unique_lock<std::mutex> lock{ event_poll_mtx };
@@ -93,8 +95,6 @@ namespace rpi
             }
 
             lock.unlock();
-            uint32_t pin;
-
             if (driver->read(&pin, sizeof(pin)) != sizeof(pin))
             {
                 continue;
@@ -114,17 +114,17 @@ namespace rpi
         }
     }
 
-    void __irq_controller::insert(uint32_t pin, const callback_t& callback)
+    void __irq_controller::request_irq(uint32_t pin, const callback_t& callback)
     {
         {
             std::lock_guard<std::mutex> lock{ event_poll_mtx };
-            callback_map.insert(std::move(std::make_pair(pin, callback)));
+            callback_map.request_irq(std::move(std::make_pair(pin, callback)));
         } // Release the lock and notify waiting thread.
         event_poll_cond.notify_one();
 
         try
         {
-            request_irq(pin);
+            kernel_request_irq(pin);
         }
         catch (const std::runtime_error& err)
         {
@@ -132,17 +132,17 @@ namespace rpi
         }
     }
 
-    void __irq_controller::erase(uint32_t key)
+    void __irq_controller::irq_free(uint32_t key)
     {
         {
             std::lock_guard<std::mutex> lock{ event_poll_mtx };
-            callback_map.erase(key);
+            callback_map.irq_free(key);
         } // Release the lock and notify waiting thread.
         event_poll_cond.notify_one();
 
         try
         {
-            free_irq(key);
+            kernel_irq_free(key);
         }
         catch (const std::runtime_error& err)
         {

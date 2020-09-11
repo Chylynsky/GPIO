@@ -143,7 +143,7 @@ namespace rpi
 				__gpio_input<_Reg>::irqs_set--;
 			}
 
-			__gpio_input<_Reg>::irq_controller->erase(pin_number);
+			__gpio_input<_Reg>::irq_controller->irq_free(pin_number);
 
 			if (__gpio_input<_Reg>::irqs_set == 0U)
 			{
@@ -234,7 +234,7 @@ namespace rpi
 
 		try
 		{
-			__gpio_input<_Reg>::irq_controller->insert(pin_number, callback);
+			__gpio_input<_Reg>::irq_controller->request_irq(pin_number, callback);
 		}
 		catch (const std::runtime_error& err)
 		{

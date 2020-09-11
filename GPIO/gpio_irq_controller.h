@@ -24,18 +24,19 @@ namespace rpi
     */
     class __irq_controller
     {
-        std::future<void> event_poll_thread;				// Thread on which events are polled.
-        std::mutex event_poll_mtx;							// Mutex for resource access control.
-        std::condition_variable event_poll_cond;			// Puts the thread to sleep when irq_controller is empty.
-        std::atomic<bool> event_poll_thread_exit;			// Loop control for event_poll_thread.
+        std::future<void>       event_poll_thread;          // Thread on which events are polled.
+        std::mutex              event_poll_mtx;             // Mutex for resource access control.
+        std::condition_variable event_poll_cond;            // Puts the thread to sleep when irq_controller is empty.
+        std::atomic<bool>       event_poll_thread_exit;     // Loop control for event_poll_thread.
 
-        std::unique_ptr<__file_descriptor> driver;						// File descriptor used for driver interaction.
-        std::multimap<uint32_t, callback_t> callback_map;				// Multimap where key - pin_number, value - entry function.
+        __file_descriptor driver;                               // File descriptor used for driver interaction.
+        std::multimap<uint32_t, callback_t> callback_map;       // Multimap where key - pin_number, value - entry function.
+
         std::unique_ptr<__dispatch_queue<callback_t>> callback_queue;	// When an event occurs, the corresponding entry function is pushed here.
 
-        void request_irq(const uint32_t pin);
-        void free_irq(const uint32_t pin);
-        void wake_driver();
+        void kernel_request_irq(const uint32_t pin);
+        void kernel_irq_free(const uint32_t pin);
+        void kernel_read_unblock();
 
     public:
 
@@ -44,9 +45,11 @@ namespace rpi
 
         // Main event_poll_thread function.
         void poll_events();
+
         // Insert new key-value pair.
-        void insert(uint32_t pin, const callback_t& callback);
+        void request_irq(uint32_t pin, const callback_t& callback);
+
         // Erase all entry functions for the specified pin.
-        void erase(uint32_t key);
+        void irq_free(uint32_t key);
     };
 }
