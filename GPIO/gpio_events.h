@@ -63,11 +63,11 @@ namespace rpi
         // Check if the specified type is an event.
         template<typename _Ty>
         inline constexpr bool __Is_event =
-            __Is_same<_Ty, irq::rising_edge> ||
-            __Is_same<_Ty, irq::falling_edge> ||
-            __Is_same<_Ty, irq::pin_high> ||
-            __Is_same<_Ty, irq::pin_low> ||
-            __Is_same<_Ty, irq::async_rising_edge> ||
+            __Is_same<_Ty, irq::rising_edge>        ||
+            __Is_same<_Ty, irq::falling_edge>       ||
+            __Is_same<_Ty, irq::pin_high>           ||
+            __Is_same<_Ty, irq::pin_low>            ||
+            __Is_same<_Ty, irq::async_rising_edge>  ||
             __Is_same<_Ty, irq::async_falling_edge>;
     }
 }

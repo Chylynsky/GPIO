@@ -20,8 +20,8 @@ static_assert(0, "Processor model must be specified as a macro definition before
 
 namespace rpi
 {
-    inline constexpr std::true_type        HIGH{};
-    inline constexpr std::false_type    LOW{};
+    inline constexpr std::true_type  HIGH{};
+    inline constexpr std::false_type LOW{};
 
     /*
         Template class gpio allows access to gpio with direction

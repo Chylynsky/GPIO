@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
-#include <linux    ypes.h>
+#include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/cdev.h>
 #include <linux/errno.h>
@@ -43,12 +43,12 @@ typedef struct _irq_mapping* irq_mapping;
 /* gpiodev device representation */
 struct gpiodev
 {
-    dev_t dev_no;                /* Device minor and major number    */
-    wait_queue_head_t wq;        /* Device wait queue                */        
-    irq_mapping irq_map;        /* List with gpio-irq mapping        */
-    struct cdev cdev;            /* Character device                 */
-    struct io_buffer ibuf;        /* Input io_buffer                 */    
-    struct io_buffer obuf;        /* Output io_buffer                */
+    dev_t dev_no;           /* Device minor and major number    */
+    wait_queue_head_t wq;   /* Device wait queue                */        
+    irq_mapping irq_map;    /* List with gpio-irq mapping       */
+    struct cdev cdev;       /* Character device                 */
+    struct io_buffer ibuf;  /* Input io_buffer                  */    
+    struct io_buffer obuf;  /* Output io_buffer                 */
 };
 
 /* 
@@ -64,7 +64,7 @@ struct command_t
 /* Helper macros for command_t struct.                                    */
 #define CMD_DETACH_IRQ    (unsigned int)0
 #define CMD_ATTACH_IRQ    (unsigned int)1
-#define CMD_WAKE_UP        (unsigned int)2
+#define CMD_WAKE_UP       (unsigned int)2
 #define CMD_CHECK_SIZE(size) (size == sizeof(struct command_t)) ? 1 : 0
 
 /*
@@ -156,11 +156,11 @@ static DEFINE_SPINLOCK(lock);
 
 /* File operations function pointers assignments */
 static struct file_operations gpiodev_fops = {
-    .owner        = THIS_MODULE,
-    .open        = device_open,
-    .release    = device_release,
-    .read        = device_read,
-    .write        = device_write
+    .owner   = THIS_MODULE,
+    .open    = device_open,
+    .release = device_release,
+    .read    = device_read,
+    .write   = device_write
 };
 
 /* Declare module entry and exit points */
@@ -194,7 +194,7 @@ int gpiodev_setup(struct gpiodev* dev, const char* name)
     }
 
     cdev_init(&dev->cdev, &gpiodev_fops);
-    dev->cdev.owner    = THIS_MODULE;
+    dev->cdev.owner = THIS_MODULE;
     dev->cdev.ops = &gpiodev_fops;
 
     err = cdev_add(&dev->cdev, dev->dev_no, 1);
@@ -326,7 +326,7 @@ ssize_t buffer_write_byte(struct io_buffer* buf, unsigned char val)
 
 ssize_t buffer_read(struct io_buffer* buf, size_t size, char* dest)
 {
-    /* Size of data to be read                        */
+    /* Size of data to be read                      */
     const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
 
     /* Copy data to dest                            */
@@ -337,10 +337,10 @@ ssize_t buffer_read(struct io_buffer* buf, size_t size, char* dest)
         buf->head++;
         i++;
     }
-    /* Set new io_buffer size                            */
+    /* Set new io_buffer size                        */
     buf->size -= bytes_to_copy;
 
-    /* Reset head if all data was copied to user    */
+    /* Reset head if all data was copied to user     */
     if (buf->size == 0U)
     {
         buf->head = 0U;
