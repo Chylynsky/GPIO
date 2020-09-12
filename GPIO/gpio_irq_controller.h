@@ -29,10 +29,10 @@ namespace rpi
         std::condition_variable event_poll_cond;            // Puts the thread to sleep when irq_controller is empty.
         std::atomic<bool>       event_poll_thread_exit;     // Loop control for event_poll_thread.
 
-        __file_descriptor driver;                               // File descriptor used for driver interaction.
-        std::multimap<uint32_t, callback_t> callback_map;       // Multimap where key - pin_number, value - entry function.
+        std::multimap<uint32_t, callback_t> callback_map;               // Multimap where key - pin_number, value - entry function.
 
-        std::unique_ptr<__dispatch_queue<callback_t>> callback_queue;	// When an event occurs, the corresponding entry function is pushed here.
+        std::unique_ptr <__file_descriptor>             driver;         // File descriptor used for driver interaction.
+        std::unique_ptr<__dispatch_queue<callback_t>>   callback_queue;	// When an event occurs, the corresponding entry function is pushed here.
 
         void kernel_request_irq(const uint32_t pin);
         void kernel_irq_free(const uint32_t pin);

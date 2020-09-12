@@ -29,4 +29,9 @@ namespace rpi::__pred
     inline constexpr bool __Is_direction = 
         __Is_input<_Dir> ||
         __Is_output<_Dir>;
+
+    template<typename _Arg>
+    inline constexpr bool __Is_constant =
+        __Is_same<_Arg, std::true_type> ||
+        __Is_same<_Arg, std::false_type>;
 }

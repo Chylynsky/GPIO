@@ -118,7 +118,7 @@ namespace rpi
     {
         {
             std::lock_guard<std::mutex> lock{ event_poll_mtx };
-            callback_map.request_irq(std::move(std::make_pair(pin, callback)));
+            callback_map.insert(std::move(std::make_pair(pin, callback)));
         } // Release the lock and notify waiting thread.
         event_poll_cond.notify_one();
 
@@ -136,7 +136,7 @@ namespace rpi
     {
         {
             std::lock_guard<std::mutex> lock{ event_poll_mtx };
-            callback_map.irq_free(key);
+            callback_map.erase(key);
         } // Release the lock and notify waiting thread.
         event_poll_cond.notify_one();
 

@@ -479,7 +479,7 @@ void irq_mapping_destroy(irq_mapping* map)
     while (curr != NULL)
     {
         next = curr->next;
-        free_irq(curr->irq, DEVICE_NAME);
+        kernel_irq_free(curr->irq, DEVICE_NAME);
         printk(KERN_INFO "irq %u freed\n", curr->irq);
         kfree(curr);
         curr = next;
@@ -500,7 +500,7 @@ int irq_mapping_push(irq_mapping* map, unsigned int gpio)
         goto free_node;
     }
 
-    if (request_irq(node->irq, irq_handler, IRQF_TRIGGER_NONE, "irq", DEVICE_NAME) < 0)
+    if (kernel_request_irq(node->irq, irq_handler, IRQF_TRIGGER_NONE, "irq", DEVICE_NAME) < 0)
     {
         goto free_node;
     }
@@ -539,7 +539,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 
     if (curr->gpio == gpio)
     {
-        free_irq(curr->irq, DEVICE_NAME);
+        kernel_irq_free(curr->irq, DEVICE_NAME);
         printk(KERN_INFO "irq %u freed\n", curr->irq);
         kfree(curr);
         *map = next;
@@ -555,7 +555,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 
         if (curr->gpio == gpio)
         {
-            free_irq(curr->irq, DEVICE_NAME);
+            kernel_irq_free(curr->irq, DEVICE_NAME);
             printk(KERN_INFO "irq %u freed\n", curr->irq);
             kfree(curr);
             prev->next = next;

@@ -2,6 +2,8 @@
 #include <chrono>
 #include <iostream>
 #include <bitset>
+#include <sstream>
+#include <fstream>
 
 #define BCM2711
 #include "gpio.h"
@@ -14,41 +16,63 @@ using namespace std::this_thread;
 
 int main()
 {
-    constexpr auto PROGRAM_WAIT_TIME{ 60s };
-    constexpr uint32_t LED_PIN_NUMBER{ 26U };
-    constexpr uint32_t BTN_PIN_NUMBER{ 25U };
+    /*
+    * Declare GPIO pin attached to the LED as output.
+    */
+    gpio<dir::output> pinLed{ 26U };
 
-    gpio<dir::output> pinLED(LED_PIN_NUMBER);	// GPIO pin with LED attached
-
-    // Create callback lambda that makes an LED blink twice
-    auto blink = [&pinLED]()
+    /*
+    * Create callback function that gets called when the button is pushed.
+    */
+    auto blink = [&pinLed]() 
     {
-        // First blink uses assignment operator
-        pinLED = 1;
+        /* 
+        * Use predefined HIGH and LOW states for optimized assignment operator. 
+        */
+        pinLed = HIGH;
         sleep_for(100ms);
-        pinLED = 0;
-        sleep_for(100ms);
-
-        // Second blink uses write function
-        pinLED.write(1);
-        sleep_for(100ms);
-        pinLED.write(0);
+        pinLed = LOW;
         sleep_for(100ms);
 
-        cout << "Blink!" << endl;
+        /* 
+        * Use any type that you like for high and low state representation,
+        * but it is best to decide on one.
+        */
+        pinLed = 1;
+        sleep_for(100ms);
+        pinLed = false;
+        sleep_for(100ms);
+
+        /*
+        * Another approach is to use a function. The flexibility of type
+        * choice remains the same.
+        */
+        pinLed.write(1);
+        sleep_for(100ms);
+        pinLed.write(0);
+        sleep_for(100ms);
     };
 
-    gpio<dir::input> pinBtn(BTN_PIN_NUMBER);	// GPIO pin with button attached
+    /*
+    * Declare GPIO pin attached to button as input.
+    */
+    gpio<dir::input> pinButton{ 25U };
 
-    pinBtn.set_pull(pull::up);	// Set pull up resistor
+    /*
+    * Set pull-up resistor.
+    */
+    pinButton.set_pull(pull::up);
 
-    // Call "blink" lambda when signal is pulled down by the button
-    pinBtn.attach_irq_callback<irq::falling_edge>(blink);
+    /*
+    * Attach lambda created earlier as a callback function for falling edge event
+    * on GPIO pin attached to the button.
+    */
+    pinButton.attach_irq_callback<irq::falling_edge>(blink);
 
-    cout << "Push the button attached to pin " << std::to_string(BTN_PIN_NUMBER) << " and enjoy the blinking LED!" << endl;
-    cout << "The program will exit after " << PROGRAM_WAIT_TIME.count() << " seconds." << endl;
-
-    sleep_for(PROGRAM_WAIT_TIME);
+    /*
+    * Exit after 60s.
+    */
+    sleep_for(60s);
 
     return 0;
 }
