@@ -16,8 +16,8 @@ namespace rpi
     template<typename _Fun>
     class __dispatch_queue : private std::queue<_Fun>
     {
-        std::future<void> dispatch_thread;            // Thread on which the functions are executed.
-        std::mutex queue_access_mtx;                // Mutex for resource access control.
+        std::future<void> dispatch_thread;  // Thread on which the functions are executed.
+        std::mutex queue_access_mtx;        // Mutex for resource access control.
 
         // Method executes queued callback functions.
         void execute_tasks();
