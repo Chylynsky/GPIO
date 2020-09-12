@@ -62,7 +62,9 @@ namespace rpi
         event_poll_cond.notify_one();
         kernel_read_unblock();
         event_poll_thread.wait();
-        callback_queue.reset();	// Destroy callback queue to avoid calling a dangling reference to a function object
+        
+        // Destroy callback queue to avoid calling a dangling reference to a function object
+        callback_queue.reset();
 
         for (auto& entry : callback_map)
         {

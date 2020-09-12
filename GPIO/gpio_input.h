@@ -18,8 +18,8 @@ namespace rpi
         static std::unique_ptr<__irq_controller> irq_controller;
         static uint32_t irqs_set;
 
-        std::list<volatile _Reg*>	event_regs_used;
-        volatile _Reg*				lev_reg;
+        std::list<volatile _Reg*>    event_regs_used;
+        volatile _Reg*                lev_reg;
     };
 
     template<typename _Reg>

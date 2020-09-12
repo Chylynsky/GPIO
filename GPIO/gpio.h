@@ -20,7 +20,7 @@ static_assert(0, "Processor model must be specified as a macro definition before
 
 namespace rpi
 {
-    inline constexpr std::true_type	    HIGH{};
+    inline constexpr std::true_type        HIGH{};
     inline constexpr std::false_type    LOW{};
 
     /*
@@ -36,8 +36,8 @@ namespace rpi
         // Select FSEL register offset based on GPIO pin number.
         volatile _Reg* get_fsel_reg();
 
-        const _Reg reg_bit_set_val;	// Value OR'ed with registers responsible for GPIO state (GPSET, GPCLR, ...)
-        const uint32_t pin_number;	// GPIO pin number.
+        const _Reg reg_bit_set_val; // Value OR'ed with registers responsible for GPIO state (GPSET, GPCLR, ...)
+        const uint32_t pin_number;  // GPIO pin number.
 
     public:
 

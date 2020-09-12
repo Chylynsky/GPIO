@@ -2,7 +2,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
-#include <linux/types.h>
+#include <linux    ypes.h>
 #include <linux/slab.h>
 #include <linux/cdev.h>
 #include <linux/errno.h>
@@ -20,16 +20,16 @@ MODULE_AUTHOR("Borys Chylinski");
 MODULE_DESCRIPTION("Helper device driver for GPIO library.");
 MODULE_VERSION(DRIVER_VERSION);
 
-/* Dynamic data structure, to be used with buffer_* functions	*/
+/* Dynamic data structure, to be used with buffer_* functions   */
 struct io_buffer
-{	
-    char* arr;			/* Pointer to the dynamic array			*/
-    size_t head;		/* Number of the read bytes				*/
-    size_t size;		/* Size of the memory in use			*/
-    size_t capacity;	/* Allocated memory size				*/
+{    
+    char* arr;            /* Pointer to the dynamic array       */
+    size_t head;        /* Number of the read bytes             */
+    size_t size;        /* Size of the memory in use            */
+    size_t capacity;    /* Allocated memory size                */
 };
 
-/* Struct representing list node with irq to gpio mapping. */
+/* Struct representing list node with irq to gpio mapping.  */
 struct _irq_mapping
 {
     unsigned int irq;
@@ -37,18 +37,18 @@ struct _irq_mapping
     struct _irq_mapping* next;
 };
 
-/* Helper typedef to avoid using _irq_mapping* directly. */
+/* Helper typedef to avoid using _irq_mapping* directly.    */
 typedef struct _irq_mapping* irq_mapping;
 
 /* gpiodev device representation */
 struct gpiodev
 {
-    dev_t dev_no;				/* Device minor and major number	*/
-    wait_queue_head_t wq;		/* Device wait queue				*/		
-    irq_mapping irq_map;		/* List with gpio-irq mapping		*/
-    struct cdev cdev;			/* Character device					*/
-    struct io_buffer ibuf;		/* Input io_buffer					*/	
-    struct io_buffer obuf;		/* Output io_buffer					*/
+    dev_t dev_no;                /* Device minor and major number    */
+    wait_queue_head_t wq;        /* Device wait queue                */        
+    irq_mapping irq_map;        /* List with gpio-irq mapping        */
+    struct cdev cdev;            /* Character device                 */
+    struct io_buffer ibuf;        /* Input io_buffer                 */    
+    struct io_buffer obuf;        /* Output io_buffer                */
 };
 
 /* 
@@ -61,86 +61,86 @@ struct command_t
     unsigned int pin_number;
 };
 
-/* Helper macros for command_t struct.									*/
-#define CMD_DETACH_IRQ	(unsigned int)0
-#define CMD_ATTACH_IRQ	(unsigned int)1
-#define CMD_WAKE_UP		(unsigned int)2
+/* Helper macros for command_t struct.                                    */
+#define CMD_DETACH_IRQ    (unsigned int)0
+#define CMD_ATTACH_IRQ    (unsigned int)1
+#define CMD_WAKE_UP        (unsigned int)2
 #define CMD_CHECK_SIZE(size) (size == sizeof(struct command_t)) ? 1 : 0
 
 /*
     Function declarations
 */
 
-/* Module entry point 													*/
+/* Module entry point                                                     */
 static int gpiodev_init(void);
 
-/* Module exit point 													*/
+/* Module exit point                                                      */
 static void gpiodev_exit(void);
 
-/* Setup gpiodev structure 												*/
+/* Setup gpiodev structure                                                */
 static int gpiodev_setup(struct gpiodev* dev, const char* name);
 
-/* Destroy gpiodev structure 											*/
+/* Destroy gpiodev structure                                              */
 static void gpiodev_destroy(struct gpiodev* dev);
 
-/* Initialize io_buffer 												*/
+/* Initialize io_buffer                                                   */
 static void buffer_init(struct io_buffer* buf);
 
-/* Deallocate io_buffer													*/
+/* Deallocate io_buffer                                                   */
 static void buffer_free(struct io_buffer* buf);
 
-/* Write data to the io_buffer											*/
+/* Write data to the io_buffer                                            */
 static ssize_t buffer_write(struct io_buffer* buf, const char* data, size_t size);
 
-/* Write data from user space to the io_buffer							*/
+/* Write data from user space to the io_buffer                            */
 static ssize_t buffer_from_user(struct io_buffer* buf, const char* __user data, size_t size);
 
-/* Write unsigned int number to the io_buffer							*/
+/* Write unsigned int number to the io_buffer                             */
 static ssize_t buffer_write_uint(struct io_buffer* buf, unsigned int val);
 
-/* Write ubyte to the io_buffer											*/
+/* Write ubyte to the io_buffer                                           */
 static ssize_t buffer_write_byte(struct io_buffer* buf, unsigned char val);
 
-/* Read data from the io_buffer and write it to the specified pointer	*/
+/* Read data from the io_buffer and write it to the specified pointer     */
 static ssize_t buffer_read(struct io_buffer* buf, size_t size, char* dest);
 
-/* Read data from the io_buffer and write it to the user space pointer	*/
+/* Read data from the io_buffer and write it to the user space pointer    */
 static ssize_t buffer_to_user(struct io_buffer* buf, size_t size, char* __user dest);
 
-/* Copy int value from the io_buffer to the dest pointer (MSB first)	*/
+/* Copy int value from the io_buffer to the dest pointer (MSB first)      */
 static ssize_t buffer_read_uint(struct io_buffer* buf, unsigned int* dest);
 
-/* Copy byte value from the io_buffer to the dest pointer (MSB first)	*/
+/* Copy byte value from the io_buffer to the dest pointer (MSB first)     */
 static ssize_t buffer_read_byte(struct io_buffer* buf, unsigned char* dest);
 
-/* Reallocate io_buffer memory											*/
+/* Reallocate io_buffer memory                                            */
 static int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed);
 
-/* Initialize irq_mapping struct.										*/
+/* Initialize irq_mapping struct.                                         */
 static void irq_mapping_init(irq_mapping* map);
 
-/* Destroy irq_mapping struct and free irqs.							*/
+/* Destroy irq_mapping struct and free irqs.                              */
 static void irq_mapping_destroy(irq_mapping* map);
 
-/* Request new irq, create mapping with gpio and push new node.			*/
+/* Request new irq, create mapping with gpio and push new node.           */
 static int irq_mapping_push(irq_mapping* map, unsigned int gpio);
 
-/* Destroy irq mapping node based on given gpio.						*/
+/* Destroy irq mapping node based on given gpio.                          */
 static int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio);
 
-/* Get gpio mapped to a given irq number.								*/
+/* Get gpio mapped to a given irq number.                                 */
 static unsigned int irq_mapping_get_gpio(irq_mapping* map, unsigned int irq);
 
-/* gpiodev 'open' file operation										*/
+/* gpiodev 'open' file operation                                          */
 static int device_open(struct inode* inode, struct file* file);
 
-/* gpiodev 'release' file operation										*/
+/* gpiodev 'release' file operation                                       */
 static int device_release(struct inode* inode, struct file* file);
 
-/* gpiodev 'read' file operation										*/
+/* gpiodev 'read' file operation                                          */
 static ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* offs);
 
-/* gpiodev 'write' file operation										*/
+/* gpiodev 'write' file operation                                         */
 static ssize_t device_write(struct file* file, const char* __user buff, size_t size, loff_t* offs);
 
 static irqreturn_t irq_handler(int irq, void* dev_id);
@@ -156,11 +156,11 @@ static DEFINE_SPINLOCK(lock);
 
 /* File operations function pointers assignments */
 static struct file_operations gpiodev_fops = {
-    .owner		= THIS_MODULE,
-    .open		= device_open,
-    .release	= device_release,
-    .read		= device_read,
-    .write		= device_write
+    .owner        = THIS_MODULE,
+    .open        = device_open,
+    .release    = device_release,
+    .read        = device_read,
+    .write        = device_write
 };
 
 /* Declare module entry and exit points */
@@ -194,7 +194,7 @@ int gpiodev_setup(struct gpiodev* dev, const char* name)
     }
 
     cdev_init(&dev->cdev, &gpiodev_fops);
-    dev->cdev.owner	= THIS_MODULE;
+    dev->cdev.owner    = THIS_MODULE;
     dev->cdev.ops = &gpiodev_fops;
 
     err = cdev_add(&dev->cdev, dev->dev_no, 1);
@@ -270,7 +270,7 @@ ssize_t buffer_write(struct io_buffer* buf, const char* data, size_t size)
         i++;
     }
 
-    buf->size += size;	/* Set new size */
+    buf->size += size;    /* Set new size */
         
     return size;
 }
@@ -326,10 +326,10 @@ ssize_t buffer_write_byte(struct io_buffer* buf, unsigned char val)
 
 ssize_t buffer_read(struct io_buffer* buf, size_t size, char* dest)
 {
-    /* Size of data to be read						*/
+    /* Size of data to be read                        */
     const size_t bytes_to_copy = (buf->size > size) ? size : buf->size;
 
-    /* Copy data to dest							*/
+    /* Copy data to dest                            */
     size_t i = 0U;
     while (i < bytes_to_copy)
     {
@@ -337,10 +337,10 @@ ssize_t buffer_read(struct io_buffer* buf, size_t size, char* dest)
         buf->head++;
         i++;
     }
-    /* Set new io_buffer size							*/
+    /* Set new io_buffer size                            */
     buf->size -= bytes_to_copy;
 
-    /* Reset head if all data was copied to user	*/
+    /* Reset head if all data was copied to user    */
     if (buf->size == 0U)
     {
         buf->head = 0U;
@@ -356,18 +356,18 @@ ssize_t buffer_to_user(struct io_buffer* buf, size_t size, char* __user dest)
         return 0;
     }
 
-    /* Size of data to be read						*/
+    /* Size of data to be read                        */
     const ssize_t bytes_to_copy = (buf->size > size) ? size : buf->size;
-    /* Number of bytes that could not be read		*/
+    /* Number of bytes that could not be read         */
     const ssize_t bytes_not_copied = (ssize_t)copy_to_user((void*)dest, (const void*)(&(buf->arr[buf->head])), (unsigned long)bytes_to_copy);
-    /* Bytes copied to dest							*/
+    /* Bytes copied to dest                           */
     const ssize_t bytes_copied = bytes_to_copy - bytes_not_copied;
-    /* Set new io_buffer size							*/
+    /* Set new io_buffer size                         */
     buf->size -= bytes_copied;
-    /* Move head									*/
+    /* Move head                                      */
     buf->head += bytes_copied;
 
-    /* Reset head if all data was copied to user	*/
+    /* Reset head if all data was copied to user      */
     if (buf->size == 0U)
     {
         buf->head = 0U;
@@ -449,11 +449,11 @@ int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed)
             i++;
         }
 
-        kfree((void*)buf->arr);				/* Deallocate old memory				*/
-        buf->arr		= tmp;				/* Assign new memory to the io_buffer	*/
-        buf->head		= 0U;				/* Reset head							*/
-        buf->size		= unread_bytes;		/* Set new size							*/
-        buf->capacity	= requested_size;	/* Set new capacity						*/
+        kfree((void*)buf->arr);               /* Deallocate old memory                */
+        buf->arr        = tmp;                /* Assign new memory to the io_buffer   */
+        buf->head        = 0U;                /* Reset head                           */
+        buf->size        = unread_bytes;      /* Set new size                         */
+        buf->capacity    = requested_size;    /* Set new capacity                     */
 
         printk(KERN_INFO "succesfully allocated %u bytes\n", requested_size);
     }
@@ -611,8 +611,8 @@ ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* o
     }
 
     /*
-    *	Lock the same spinlock as the interrupt handler. Iterrupt
-    *	handler passes interrupted gpio number to the device output buffer.
+    *    Lock the same spinlock as the interrupt handler. Iterrupt
+    *    handler passes interrupted gpio number to the device output buffer.
     */
 
     spin_lock(&lock);
