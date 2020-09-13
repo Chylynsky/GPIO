@@ -12,6 +12,8 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 
+#define CHECK_NULLPTR(ptr, line) if (ptr == NULL) { printk(KERN_INFO "nullptr detected at %u\n", line); }
+
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
 
@@ -186,7 +188,7 @@ void __exit gpiodev_exit(void)
 int gpiodev_setup(struct gpiodev* dev, const char* name)
 {
     int err = alloc_chrdev_region(&dev->dev_no, 0U, 1U, name);
-
+    
     if (err)
     {
         printk(KERN_ALERT "alloc_chrdev_region failed\n");
@@ -205,10 +207,7 @@ int gpiodev_setup(struct gpiodev* dev, const char* name)
         goto delete_cdev;
     }
 
-    buffer_init(&dev->ibuf);
-    buffer_init(&dev->obuf);
     init_waitqueue_head(&dev->wq);
-    irq_mapping_init(&dev->irq_map);
 
     return 0;
 
@@ -227,6 +226,7 @@ void gpiodev_destroy(struct gpiodev* dev)
     wake_up_interruptible(&dev->wq);
     buffer_free(&dev->ibuf);
     buffer_free(&dev->obuf);
+
     cdev_del(&dev->cdev);
     unregister_chrdev_region(dev->dev_no, 1U);
 }
@@ -288,6 +288,7 @@ ssize_t buffer_from_user(struct io_buffer* buf, const char* __user data, size_t 
     }
 
     /* Copy data to io_buffer */
+    CHECK_NULLPTR((void*)(&(buf->arr[buf->head + buf->size])), 291);
     unsigned long bytes_not_copied = copy_from_user((void*)(&(buf->arr[buf->head + buf->size])), (const void*)data, (unsigned long)size);
     unsigned long bytes_copied = size - bytes_not_copied;
     buf->size += bytes_copied;
@@ -450,7 +451,7 @@ int buffer_extend_if_needed(struct io_buffer* buf, size_t size_needed)
         }
 
         kfree((void*)buf->arr);               /* Deallocate old memory                */
-        buf->arr        = tmp;                /* Assign new memory to the io_buffer   */
+        buf->arr         = tmp;               /* Assign new memory to the io_buffer   */
         buf->head        = 0U;                /* Reset head                           */
         buf->size        = unread_bytes;      /* Set new size                         */
         buf->capacity    = requested_size;    /* Set new capacity                     */
@@ -479,7 +480,7 @@ void irq_mapping_destroy(irq_mapping* map)
     while (curr != NULL)
     {
         next = curr->next;
-        kernel_irq_free(curr->irq, DEVICE_NAME);
+        free_irq(curr->irq, DEVICE_NAME);
         printk(KERN_INFO "irq %u freed\n", curr->irq);
         kfree(curr);
         curr = next;
@@ -500,7 +501,7 @@ int irq_mapping_push(irq_mapping* map, unsigned int gpio)
         goto free_node;
     }
 
-    if (kernel_request_irq(node->irq, irq_handler, IRQF_TRIGGER_NONE, "irq", DEVICE_NAME) < 0)
+    if (request_irq(node->irq, irq_handler, IRQF_TRIGGER_NONE, "irq", DEVICE_NAME) < 0)
     {
         goto free_node;
     }
@@ -539,7 +540,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 
     if (curr->gpio == gpio)
     {
-        kernel_irq_free(curr->irq, DEVICE_NAME);
+        free_irq(curr->irq, DEVICE_NAME);
         printk(KERN_INFO "irq %u freed\n", curr->irq);
         kfree(curr);
         *map = next;
@@ -555,7 +556,7 @@ int irq_mapping_erase_gpio(irq_mapping* map, unsigned int gpio)
 
         if (curr->gpio == gpio)
         {
-            kernel_irq_free(curr->irq, DEVICE_NAME);
+            free_irq(curr->irq, DEVICE_NAME);
             printk(KERN_INFO "irq %u freed\n", curr->irq);
             kfree(curr);
             prev->next = next;
@@ -592,12 +593,18 @@ unsigned int irq_mapping_get_gpio(irq_mapping* map, unsigned int irq)
 
 int device_open(struct inode* inode, struct file* file)
 {
+    buffer_init(&dev.ibuf);
+    buffer_init(&dev.obuf);
+    irq_mapping_init(&dev.irq_map);
     return 0;
 }
 
 int device_release(struct inode* inode, struct file* file)
 {
+    irq_mapping_destroy(&dev.irq_map);
     wake_up_interruptible(&dev.wq);
+    buffer_free(&dev.ibuf);
+    buffer_free(&dev.obuf);
     return 0;
 }
 
@@ -617,8 +624,7 @@ ssize_t device_read(struct file* file, char* __user buff, size_t size, loff_t* o
 
     spin_lock(&lock);
 
-    printk(KERN_INFO "value %u copied to user\n", *((unsigned int*)(&dev.obuf.arr[dev.obuf.head])));
-    ssize_t result =  buffer_to_user(&dev.obuf, size, buff);
+    ssize_t result = buffer_to_user(&dev.obuf, size, buff);
 
     spin_unlock(&lock);
 
@@ -634,7 +640,7 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
         printk(KERN_INFO "bad command size\n");
         return -1;
     }
-
+    
     ssize_t bytes_read = buffer_from_user(&dev.ibuf, buff, size);
     struct command_t cmd;
 
@@ -680,10 +686,21 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 irqreturn_t irq_handler(int irq, void* dev_id)
 {
     printk(KERN_INFO "irq %i triggered\n", irq);
+    unsigned int gpio;
     unsigned int flags;
 
     spin_lock_irqsave(&lock, flags);
-    buffer_write_uint(&dev.obuf, irq_mapping_get_gpio(&dev.irq_map, irq));
+    CHECK_NULLPTR(&dev.irq_map, 696);
+    gpio = irq_mapping_get_gpio(&dev.irq_map, irq);
+
+    if (gpio == -1)
+    {
+        spin_unlock_irqrestore(&lock, flags);
+        return IRQ_HANDLED;
+    }
+
+    CHECK_NULLPTR(&dev.obuf.arr, 706);
+    buffer_write_uint(&dev.obuf, gpio);
     spin_unlock_irqrestore(&lock, flags);
 
     wake_up_interruptible(&dev.wq);
