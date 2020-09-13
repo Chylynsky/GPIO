@@ -16,19 +16,13 @@ using namespace std::this_thread;
 
 int main()
 {
-    /*
-    * Declare GPIO pin attached to the LED as output.
-    */
+    // Declare GPIO pin attached to the LED as output.
     gpio<dir::output> pinLed{ 26U };
 
-    /*
-    * Create callback function that gets called when the button is pushed.
-    */
+    // Create callback function that gets called when the button is pushed.
     auto blink = [&pinLed]() 
     {
-        /* 
-        * Use predefined HIGH and LOW states for optimized assignment operator. 
-        */
+        // Use predefined HIGH and LOW states for optimized assignment operator. 
         pinLed = HIGH;
         sleep_for(100ms);
         pinLed = LOW;
@@ -53,14 +47,10 @@ int main()
         sleep_for(100ms);
     };
 
-    /*
-    * Declare GPIO pin attached to button as input.
-    */
+    // Declare GPIO pin attached to button as input.
     gpio<dir::input> pinButton{ 25U };
 
-    /*
-    * Set pull-up resistor.
-    */
+    // Set pull-up resistor.
     pinButton.set_pull(pull::up);
 
     /*
@@ -69,9 +59,7 @@ int main()
     */
     pinButton.attach_irq_callback<irq::falling_edge>(blink);
 
-    /*
-    * Exit after 60s.
-    */
+    // Exit after 60s.
     sleep_for(60s);
 
     return 0;
