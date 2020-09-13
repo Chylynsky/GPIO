@@ -25,7 +25,7 @@ namespace rpi
 
         if (result != __kernel::COMMAND_SIZE)
         {
-            throw std::runtime_error("IRQ request failed.");
+            throw std::runtime_error("IRQ free failed.");
         }
     }
 
@@ -36,7 +36,7 @@ namespace rpi
 
         if (result != __kernel::COMMAND_SIZE)
         {
-            throw std::runtime_error("IRQ request failed.");
+            throw std::runtime_error("Read unblocking failed.");
         }
     }
 
@@ -52,16 +52,17 @@ namespace rpi
         {
             throw err;
         }
-
-        event_poll_thread = std::async(std::launch::async, [this]() { poll_events(); });
     }
 
     __irq_controller::~__irq_controller()
     {
         event_poll_thread_exit = true;
-        event_poll_cond.notify_one();
         kernel_read_unblock();
-        event_poll_thread.wait();
+
+        if (event_poll_thread.valid())
+        {
+            event_poll_thread.wait();
+        }
         
         // Destroy callback queue to avoid calling a dangling reference to a function object
         callback_queue.reset();
@@ -88,21 +89,12 @@ namespace rpi
 
         while (!event_poll_thread_exit)
         {
-            std::unique_lock<std::mutex> lock{ event_poll_mtx };
-            if (callback_map.empty())
-            {
-                // Wait untill irq_controller is not empty.
-                event_poll_cond.wait(lock, [this]() { return (!callback_map.empty() || event_poll_thread_exit); });
-                continue;
-            }
-
-            lock.unlock();
             if (driver->read(&pin, sizeof(pin)) != sizeof(pin))
             {
                 continue;
             }
 
-            lock.lock();
+            std::unique_lock<std::mutex> lock{ event_poll_mtx };
             auto entry = callback_map.find(pin);
 
             if (entry != callback_map.end())
@@ -111,8 +103,6 @@ namespace rpi
                 callback_queue->push((*entry).second);
                 continue;
             }
-
-            lock.unlock();
         }
     }
 
@@ -120,9 +110,15 @@ namespace rpi
     {
         {
             std::lock_guard<std::mutex> lock{ event_poll_mtx };
+
+            if (callback_map.empty())
+            {
+                event_poll_thread_exit = false;
+                event_poll_thread = std::async(std::launch::async, [this]() { poll_events(); });
+            }
+
             callback_map.insert(std::move(std::make_pair(pin, callback)));
-        } // Release the lock and notify waiting thread.
-        event_poll_cond.notify_one();
+        }
 
         try
         {
@@ -136,12 +132,6 @@ namespace rpi
 
     void __irq_controller::irq_free(uint32_t key)
     {
-        {
-            std::lock_guard<std::mutex> lock{ event_poll_mtx };
-            callback_map.erase(key);
-        } // Release the lock and notify waiting thread.
-        event_poll_cond.notify_one();
-
         try
         {
             kernel_irq_free(key);
@@ -149,6 +139,24 @@ namespace rpi
         catch (const std::runtime_error& err)
         {
             throw err;
+        }
+
+        {
+            std::lock_guard<std::mutex> lock{ event_poll_mtx };
+            callback_map.erase(key);
+
+            if (!callback_map.empty())
+            {
+                return;
+            }
+        }
+
+        event_poll_thread_exit = true;
+        kernel_read_unblock();
+                
+        if (event_poll_thread.valid())
+        {
+            event_poll_thread.wait();
         }
     }
 }
