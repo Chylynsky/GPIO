@@ -5,7 +5,7 @@
 #if defined(BCM2711)
 #include "bcm2711.h"
 #else
-static_assert(0, "No processor model was specified.");
+static_assert(0, "Processor model must be specified as a macro definition before including gpio.h.");
 #endif
 
 namespace rpi

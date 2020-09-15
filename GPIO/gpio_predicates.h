@@ -10,6 +10,9 @@ namespace rpi::__pred
     template<bool _Cond, typename Iftrue, typename Iffalse>
     using __Select_if = typename std::conditional_t<_Cond, Iftrue, Iffalse>;
 
+    template<bool _Cond, typename Iftrue, typename Iffalse>
+    using __Derive_if = __Select_if<_Cond, Iftrue, Iffalse>;
+
     template<typename _Ty1, typename _Ty2>
     inline constexpr bool __Is_same = std::is_same_v<_Ty1, _Ty2>;
 

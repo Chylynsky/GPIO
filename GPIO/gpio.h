@@ -28,7 +28,7 @@ namespace rpi
         specified by the template type _Dir and register type _Reg.
     */
     template<typename _Dir, typename _Reg = __addr::reg_t>
-    class gpio : private __pred::__Select_if<__pred::__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
+    class gpio : private __pred::__Derive_if<__pred::__Is_input<_Dir>, __gpio_input<_Reg>, __gpio_output<_Reg>>
     {
         static_assert(__pred::__Is_direction<_Dir>, "Template type _Dir must be either dir::input or dir::output.");
         static_assert(__pred::__Is_integral<_Reg>, "Template type _Reg must be integral.");
@@ -77,9 +77,13 @@ namespace rpi
             __pred::__Is_input<_Ty>, pull> get_pull() noexcept;
 
         // Set event callback.
-        template<typename _Ev, typename _Ty = _Dir>
+        template<typename _Ev, typename _Mode = irq_mode::polled, typename _Ty = _Dir>
+        __pred::__Enable_if <
+            __pred::__Is_input<_Ty> && __pred::__Is_event<_Ev> && __pred::__Is_irq_mode<_Mode>, void> attach_irq_callback(const callback_t& callback);
+
+        template<typename _Ty = _Dir>
         __pred::__Enable_if<
-            __pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, void> attach_irq_callback(const callback_t& callback);
+            __pred::__Is_input<_Ty>, void> set_poll_interval(std::chrono::nanoseconds value);
 
         // Deleted methods.
 
@@ -252,9 +256,9 @@ namespace rpi
     }
 
     template<typename _Dir, typename _Reg>
-    template<typename _Ev, typename _Ty>
+    template<typename _Ev, typename _Mode, typename _Ty>
     __pred::__Enable_if<
-        __pred::__Is_input<_Ty> && __pred::__Is_event<_Ev>, 
+        __pred::__Is_input<_Ty> && __pred::__Is_event<_Ev> && __pred::__Is_irq_mode<_Mode>,
         void> gpio<_Dir, _Reg>::attach_irq_callback(const callback_t& callback)
     {
         // Get event register based on event type.
@@ -262,7 +266,21 @@ namespace rpi
 
         if (__gpio_input<_Reg>::irqs_set == 0U)
         {
-            __gpio_input<_Reg>::irq_controller = std::make_unique<__irq_controller>();
+            if constexpr (__pred::__Is_polled<_Mode>)
+            {
+                __gpio_input<_Reg>::irq_controller = std::make_unique<__irq_controller<_Mode>>();
+            }
+            else
+            {
+                try
+                {
+                    __gpio_input<_Reg>::irq_controller = std::make_unique<__irq_controller<_Mode>>();
+                }
+                catch (const std::runtime_error& err)
+                {
+                    throw err;
+                }
+            }
         }
 
         try
@@ -281,5 +299,12 @@ namespace rpi
         *event_reg |= reg_bit_set_val;
 
         __gpio_input<_Reg>::event_regs_used.push_back(event_reg);
+    }
+
+    template<typename _Dir, typename _Reg>
+    template<typename _Ty>
+    inline __pred::__Enable_if<__pred::__Is_input<_Ty>, void> gpio<_Dir, _Reg>::set_poll_interval(std::chrono::nanoseconds interval)
+    {
+        __gpio_input<_Reg>::irq_controller->set_poll_interval(interval);
     }
 }

@@ -1,9 +1,6 @@
 #include <thread>
 #include <chrono>
 #include <iostream>
-#include <bitset>
-#include <sstream>
-#include <fstream>
 
 #define BCM2711
 #include "gpio.h"
@@ -19,7 +16,13 @@ int main()
     // Declare GPIO pin attached to the LED as output.
     gpio<dir::output> pinLed{ 26U };
 
-    // Create callback function that gets called when the button is pushed.
+    /* 
+    * Create callback function that gets called when the button is pushed.
+    * 
+    *                   ***   NOTE    ***
+    * This is just an example, normally you would not want
+    * your interrupt handler to execute that long.
+    */
     auto blink = [&pinLed]() 
     {
         // Use predefined HIGH and LOW states for optimized assignment operator. 
@@ -57,7 +60,7 @@ int main()
     * Attach lambda created earlier as a callback function for falling edge event
     * on GPIO pin attached to the button.
     */
-    pinButton.attach_irq_callback<irq::falling_edge>(blink);
+    pinButton.attach_irq_callback<irq::falling_edge, irq_mode::driver>(blink);
 
     // Exit after 60s.
     sleep_for(60s);
