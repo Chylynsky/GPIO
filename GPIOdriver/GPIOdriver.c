@@ -12,7 +12,7 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 
-#define CHECK_NULLPTR(ptr, line) if (ptr == NULL) { printk(KERN_INFO "nullptr detected at %u\n", line); }
+#define CHECK_NULLPTR(ptr, line) if (ptr == NULL) { printk(KERN_WARNING "nullptr detected at %u\n", line); }
 
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"

@@ -16,7 +16,7 @@ namespace rpi::__impl
         std::mutex          event_poll_mtx;         // Mutex for resource access control.
         std::atomic<bool>   event_poll_thread_exit; // Loop control for event_poll_thread.
 
-        std::multimap<uint32_t, callback_t>             callback_map;     // Multimap where key - pin_number, value - callback.
+        std::multimap<uint32_t, callback_t>           callback_map;     // Multimap where key - pin_number, value - callback.
         std::unique_ptr<dispatch_queue<callback_t>>   callback_queue;   // When an event occurs, the corresponding entry function is pushed here.
 
     public:
