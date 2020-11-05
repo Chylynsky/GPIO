@@ -7,14 +7,14 @@
 #include <atomic>
 #include <iostream>
 
-namespace rpi
+namespace rpi::__impl
 {
     /*
         Template class responsible for queued callback 
         execution on a seperate thread.
     */
     template<typename _Fun>
-    class __dispatch_queue : private std::queue<_Fun>
+    class dispatch_queue : private std::queue<_Fun>
     {
         std::future<void> dispatch_thread;  // Thread on which the functions are executed.
         std::mutex queue_access_mtx;        // Mutex for resource access control.
@@ -25,15 +25,15 @@ namespace rpi
     public:
 
         // Constructor.
-        __dispatch_queue();
+        dispatch_queue();
         // Destructor.
-        ~__dispatch_queue();
+        ~dispatch_queue();
         // Push the function to the end of the queue.
         void push(const _Fun& fun);
     };
 
     template<typename _Fun>
-    inline void __dispatch_queue<_Fun>::execute_tasks()
+    inline void dispatch_queue<_Fun>::execute_tasks()
     {
         std::unique_lock<std::mutex> lock{ queue_access_mtx };
 
@@ -48,12 +48,12 @@ namespace rpi
     }
 
     template<typename _Fun>
-    inline __dispatch_queue<_Fun>::__dispatch_queue() : dispatch_thread{}
+    inline dispatch_queue<_Fun>::dispatch_queue() : dispatch_thread{}
     {
     }
 
     template<typename _Fun>
-    inline __dispatch_queue<_Fun>::~__dispatch_queue()
+    inline dispatch_queue<_Fun>::~dispatch_queue()
     {
         {
             std::lock_guard<std::mutex> lock{ queue_access_mtx };
@@ -71,7 +71,7 @@ namespace rpi
     }
 
     template<typename _Fun>
-    inline void __dispatch_queue<_Fun>::push(const _Fun& fun)
+    inline void dispatch_queue<_Fun>::push(const _Fun& fun)
     {
         std::lock_guard<std::mutex> lock(queue_access_mtx);
 

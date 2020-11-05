@@ -1,14 +1,14 @@
 #pragma once
 
 /*
-    __gpio_output struct holds fields unique for gpio class input
+    gpio_output struct holds fields unique for gpio class input
     template type specialization.
 */
 
-namespace rpi
+namespace rpi::__impl
 {
     template<typename _Reg>
-    struct __gpio_output
+    struct gpio_output
     {
         volatile _Reg* set_reg;
         volatile _Reg* clr_reg;

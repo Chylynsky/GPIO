@@ -9,7 +9,7 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-namespace rpi
+namespace rpi::__impl
 {
     /*
         Register size in bits.
@@ -20,14 +20,14 @@ namespace rpi
     /*
         Linux file descriptor RAII wrapper.
     */
-    class __file_descriptor
+    class file_descriptor
     {
         const int fd; // File descriptor.
 
     public:
 
         // Constructor.
-        explicit __file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+        explicit file_descriptor(const std::string& path, int flags = 0) : fd{ open(path.c_str(), flags) }
         {
             if (fd == -1)
             {
@@ -36,7 +36,7 @@ namespace rpi
         }
 
         // Constructor.
-        explicit __file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
+        explicit file_descriptor(std::string&& path, int flags = 0) : fd{ open(path.c_str(), flags) }
         {
             if (fd == -1)
             {
@@ -45,7 +45,7 @@ namespace rpi
         }
 
         // Constructor
-        explicit __file_descriptor(int fd) : fd{ fd } 
+        explicit file_descriptor(int fd) : fd{ fd } 
         {
             if (fd == -1)
             {
@@ -54,7 +54,7 @@ namespace rpi
         };
 
         // Destructor.
-        ~__file_descriptor()
+        ~file_descriptor()
         {
             close(fd);
         }
@@ -84,28 +84,28 @@ namespace rpi
         /*
             Deleted functions.
         */
-        __file_descriptor() = delete;
-        __file_descriptor& operator=(const __file_descriptor&) = delete;
-        __file_descriptor& operator=(__file_descriptor&&) = delete;
+        file_descriptor() = delete;
+        file_descriptor& operator=(const file_descriptor&) = delete;
+        file_descriptor& operator=(file_descriptor&&) = delete;
     };
 
     /*
         Functor used to map memory and access it easily.
     */
     template<typename _Reg>
-    class __Get_reg_ptr
+    class Get_reg_ptr
     {
         static volatile _Reg* GPIO_REGISTER_BASE_MAPPED;
 
-        static volatile _Reg* MapMemoryAddressSpace()
+        static volatile _Reg* map_memory_address_space()
         {
             const std::string map_file = "/dev/gpiomem";
 
-            std::unique_ptr<__file_descriptor> fd;
+            std::unique_ptr<file_descriptor> fd;
             
             try
             {
-                fd = std::make_unique<__file_descriptor>(map_file, O_RDWR | O_SYNC);
+                fd = std::make_unique<file_descriptor>(map_file, O_RDWR | O_SYNC);
             }
             catch (const std::runtime_error& err)
             {
@@ -138,18 +138,18 @@ namespace rpi
     };
 
     template<typename _Reg>
-    volatile _Reg* __Get_reg_ptr<_Reg>::GPIO_REGISTER_BASE_MAPPED{ __Get_reg_ptr::MapMemoryAddressSpace() };
+    volatile _Reg* Get_reg_ptr<_Reg>::GPIO_REGISTER_BASE_MAPPED{ Get_reg_ptr::map_memory_address_space() };
 
     /* 
         Global function object. Returns volatile uint32_t pointer
         to the mapped register.
     */
     template<typename _Reg>
-    inline const __Get_reg_ptr<_Reg> __get_reg_ptr{};
+    inline const Get_reg_ptr<_Reg> get_reg_ptr{};
 
     /* 
         Get base event register offs.
     */
     template<typename _Reg, typename _Ev>
-    inline constexpr _Reg __Event_reg_offs = _Ev::offs;
+    inline constexpr _Reg Event_reg_offs = _Ev::offs;
 }

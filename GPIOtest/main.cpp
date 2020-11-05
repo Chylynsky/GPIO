@@ -2,7 +2,6 @@
 #include <chrono>
 #include <iostream>
 
-#define BCM2711
 #include "gpio.h"
 
 using namespace rpi;
@@ -15,7 +14,7 @@ int main()
 {
     // Declare GPIO pin attached to the LED as output.
     gpio<dir::output> pinLed{ 26U };
-
+    
     /* 
     * Create callback function that gets called when the button is pushed.
     * 
@@ -60,7 +59,7 @@ int main()
     * Attach lambda created earlier as a callback function for falling edge event
     * on GPIO pin attached to the button.
     */
-    pinButton.attach_irq_callback<irq::falling_edge, irq_mode::driver>(blink);
+    pinButton.attach_irq_callback<irq::falling_edge>(blink);
 
     // Exit after 60s.
     sleep_for(60s);

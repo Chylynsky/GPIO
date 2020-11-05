@@ -2,7 +2,7 @@
 #include <type_traits>
 #include "gpio_direction.h"
 
-namespace rpi::__pred
+namespace rpi::__impl::traits
 {
     template<bool _Cond, typename _Ty = void>
     using Enable_if = typename std::enable_if_t<_Cond, _Ty>;

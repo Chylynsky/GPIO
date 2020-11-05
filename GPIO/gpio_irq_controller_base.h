@@ -6,9 +6,9 @@
 #include "gpio_aliases.h"
 #include "dispatch_queue.h"
 
-namespace rpi
+namespace rpi::__impl
 {
-    class __irq_controller_base
+    class irq_controller_base
     {
     protected:
 
@@ -16,13 +16,13 @@ namespace rpi
         std::mutex          event_poll_mtx;         // Mutex for resource access control.
         std::atomic<bool>   event_poll_thread_exit; // Loop control for event_poll_thread.
 
-        std::multimap<uint32_t, callback_t>             callback_map;     // Multimap where key - pin_number, value - callback.
-        std::unique_ptr<__dispatch_queue<callback_t>>   callback_queue;   // When an event occurs, the corresponding entry function is pushed here.
+        std::multimap<uint32_t, callback_t>           callback_map;     // Multimap where key - pin_number, value - callback.
+        std::unique_ptr<dispatch_queue<callback_t>>   callback_queue;   // When an event occurs, the corresponding entry function is pushed here.
 
     public:
 
-        __irq_controller_base();
-        virtual ~__irq_controller_base() {};
+        irq_controller_base();
+        virtual ~irq_controller_base() {};
 
         // Main event_poll_thread function.
         virtual void poll_events() = 0;

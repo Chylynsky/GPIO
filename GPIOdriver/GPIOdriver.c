@@ -12,7 +12,7 @@
 #include <linux/wait.h>
 #include <linux/spinlock.h>
 
-#define CHECK_NULLPTR(ptr, line) if (ptr == NULL) { printk(KERN_INFO "nullptr detected at %u\n", line); }
+#define CHECK_NULLPTR(ptr, line) if (ptr == NULL) { printk(KERN_WARNING "nullptr detected at %u\n", line); }
 
 #define DRIVER_VERSION "0.0.1"
 #define DEVICE_NAME "gpiodev"
@@ -60,7 +60,7 @@ struct gpiodev
 struct command_t
 {
     unsigned int type;
-    unsigned int pin_number;
+    unsigned int gpio_number;
 };
 
 /* Helper macros for command_t struct.                                    */
@@ -652,7 +652,7 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
 
     if (cmd.type == CMD_ATTACH_IRQ)
     {
-        if (irq_mapping_push(&dev.irq_map, cmd.pin_number) < 0)
+        if (irq_mapping_push(&dev.irq_map, cmd.gpio_number) < 0)
         {
             printk(KERN_INFO "unable to request irq\n");
             return -1;
@@ -662,7 +662,7 @@ ssize_t device_write(struct file* file, const char* __user buff, size_t size, lo
     }
     else if (cmd.type == CMD_DETACH_IRQ)
     {
-        if (irq_mapping_erase_gpio(&dev.irq_map, cmd.pin_number) < 0)
+        if (irq_mapping_erase_gpio(&dev.irq_map, cmd.gpio_number) < 0)
         {
             printk(KERN_INFO "unable to free irq\n");
             return -1;
