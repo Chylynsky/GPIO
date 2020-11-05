@@ -1,6 +1,6 @@
 #pragma once
 #include <functional>
-#include "gpio_predicates.h"
+#include "gpio_traits.h"
 
 namespace rpi
 {

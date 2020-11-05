@@ -1,12 +1,8 @@
 #pragma once
 #include <cstdint>
-#include "gpio_predicates.h"
 
-#if defined(BCM2711)
+#include "gpio_traits.h"
 #include "bcm2711.h"
-#else
-static_assert(0, "Processor model must be specified as a macro definition before including gpio.h.");
-#endif
 
 namespace rpi
 {
@@ -20,41 +16,41 @@ namespace rpi
         // Rising edge event type.
         struct rising_edge
         {
-            static constexpr __addr::reg_t offs = __addr::GPREN0;
+            static constexpr reg_t offs = __impl::addr::GPREN0;
         };
 
         // Falling edge event type.
         struct falling_edge
         {
-            static constexpr __addr::reg_t offs = __addr::GPFEN0;
+            static constexpr reg_t offs = __impl::addr::GPFEN0;
         };
 
         // Pin high event type.
         struct pin_high
         {
-            static constexpr __addr::reg_t offs = __addr::GPHEN0;
+            static constexpr reg_t offs = __impl::addr::GPHEN0;
         };
 
         // Pin low event type.
         struct pin_low
         {
-            static constexpr __addr::reg_t offs = __addr::GPLEN0;
+            static constexpr reg_t offs = __impl::addr::GPLEN0;
         };
 
         // Asynchronous rising edge event type.
         struct async_rising_edge
         {
-            static constexpr __addr::reg_t offs = __addr::GPAREN0;
+            static constexpr reg_t offs = __impl::addr::GPAREN0;
         };
 
         // Asynchronous falling edge event type.
         struct async_falling_edge
         {
-            static constexpr __addr::reg_t offs = __addr::GPAFEN0;
+            static constexpr reg_t offs = __impl::addr::GPAFEN0;
         };
     }
 
-    namespace __pred
+    namespace __impl::traits
     {
         /*
             Additional helper predicate for events.
@@ -62,12 +58,12 @@ namespace rpi
 
         // Check if the specified type is an event.
         template<typename _Ty>
-        inline constexpr bool __Is_event =
-            __Is_same<_Ty, irq::rising_edge>        ||
-            __Is_same<_Ty, irq::falling_edge>       ||
-            __Is_same<_Ty, irq::pin_high>           ||
-            __Is_same<_Ty, irq::pin_low>            ||
-            __Is_same<_Ty, irq::async_rising_edge>  ||
-            __Is_same<_Ty, irq::async_falling_edge>;
+        inline constexpr bool Is_event =
+            Is_same<_Ty, irq::rising_edge>        ||
+            Is_same<_Ty, irq::falling_edge>       ||
+            Is_same<_Ty, irq::pin_high>           ||
+            Is_same<_Ty, irq::pin_low>            ||
+            Is_same<_Ty, irq::async_rising_edge>  ||
+            Is_same<_Ty, irq::async_falling_edge>;
     }
 }

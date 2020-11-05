@@ -1,6 +1,6 @@
 #pragma once
 
-namespace rpi::__kernel
+namespace rpi::__impl::kernel
 {
     struct command_t
     {
