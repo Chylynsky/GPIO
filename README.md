@@ -94,4 +94,4 @@ Inside of the *irq* namespace one can find all the handled events. The event cho
 can be a function pointer, lambda or std::function<void()>, bearing in mind it has to be *void fun()* type of the function.
 
 ## Author
-* **Borys Chyliński** - *Backend* - [Chylynsky](https://github.com/Chylynsky)
+* **Borys Chyliński** - [Chylynsky](https://github.com/Chylynsky)
