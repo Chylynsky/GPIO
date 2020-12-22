@@ -14,55 +14,17 @@ int main()
 {
     // Declare GPIO pin attached to the LED as output.
     gpio<dir::output> pinLed{ 26U };
-    
-    /* 
-    * Create callback function that gets called when the button is pushed.
-    * 
-    *                   ***   NOTE    ***
-    * This is just an example, normally you would not want
-    * your interrupt handler to execute that long.
-    */
-    auto blink = [&pinLed]() 
+
+    for (int i = 0; i < 10; i++)
     {
-        // Use predefined HIGH and LOW states for optimized assignment operator. 
-        pinLed = HIGH;
-        sleep_for(100ms);
-        pinLed = LOW;
-        sleep_for(100ms);
-
-        /* 
-        * Use any type that you like for high and low state representation,
-        * but it is best to decide on one.
-        */
-        pinLed = 1;
-        sleep_for(100ms);
-        pinLed = false;
-        sleep_for(100ms);
-
-        /*
-        * Another approach is to use a function. The flexibility of type
-        * choice remains the same.
-        */
-        pinLed.write(1);
-        sleep_for(100ms);
-        pinLed.write(0);
-        sleep_for(100ms);
-    };
-
-    // Declare GPIO pin attached to button as input.
-    gpio<dir::input> pinButton{ 25U };
-
-    // Set pull-up resistor.
-    pinButton.set_pull(pull::up);
-
-    /*
-    * Attach lambda created earlier as a callback function for falling edge event
-    * on GPIO pin attached to the button.
-    */
-    pinButton.attach_irq_callback<irq::falling_edge>(blink);
-
-    // Exit after 60s.
-    sleep_for(60s);
+        pinLed = HIGH;      // Use optimized assignment operator.
+        sleep_for(200ms);
+        pinLed = false;     // Use standard assignment operator.
+        sleep_for(200ms);
+        pinLed.write(1);    // Use function to assign value. Value must be convertible to bool.
+        sleep_for(200ms);
+        pinLed = 0;
+    }
 
     return 0;
 }

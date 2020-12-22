@@ -72,10 +72,14 @@ namespace rpi
         __impl::traits::Enable_if<
             __impl::traits::Is_input<_Ty>, pull> get_pull() noexcept;
 
+#ifdef EXPERIMENTAL
+
         // Set event callback.
         template<typename _Ev, typename _Ty = _Dir>
         __impl::traits::Enable_if <
             __impl::traits::Is_input<_Ty> && __impl::traits::Is_event<_Ev>, void> attach_irq_callback(const callback_t& callback);
+
+#endif
 
         // Deleted methods.
 
@@ -238,6 +242,8 @@ namespace rpi
         return static_cast<pull>(*reg_sel >> (2U * (pin_number % 16U)) & 0b11U);
     }
 
+#ifdef EXPERIMENTAL
+
     template<typename _Dir>
     template<typename _Ev, typename _Ty>
     __impl::traits::Enable_if<
@@ -276,4 +282,6 @@ namespace rpi
 
         __impl::gpio_input<reg_t>::event_regs_used.push_back(event_reg);
     }
+
+#endif
 }
