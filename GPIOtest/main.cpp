@@ -4,65 +4,48 @@
 
 #include "gpio.h"
 
-using namespace rpi;
-using namespace std;
-using namespace std::chrono;
-using namespace std::chrono_literals;
-using namespace std::this_thread;
-
 int main()
 {
+    using namespace rpi;
+    using namespace std;
+    using namespace std::chrono;
+    using namespace std::chrono_literals;
+    using namespace std::this_thread;
+
     // Declare GPIO pin attached to the LED as output.
-    gpio<dir::output> pinLed{ 26U };
-    
-    /* 
-    * Create callback function that gets called when the button is pushed.
-    * 
-    *                   ***   NOTE    ***
-    * This is just an example, normally you would not want
-    * your interrupt handler to execute that long.
-    */
-    auto blink = [&pinLed]() 
-    {
-        // Use predefined HIGH and LOW states for optimized assignment operator. 
-        pinLed = HIGH;
-        sleep_for(100ms);
-        pinLed = LOW;
-        sleep_for(100ms);
-
-        /* 
-        * Use any type that you like for high and low state representation,
-        * but it is best to decide on one.
-        */
-        pinLed = 1;
-        sleep_for(100ms);
-        pinLed = false;
-        sleep_for(100ms);
-
-        /*
-        * Another approach is to use a function. The flexibility of type
-        * choice remains the same.
-        */
-        pinLed.write(1);
-        sleep_for(100ms);
-        pinLed.write(0);
-        sleep_for(100ms);
-    };
-
-    // Declare GPIO pin attached to button as input.
-    gpio<dir::input> pinButton{ 25U };
-
-    // Set pull-up resistor.
+    gpio<dir::output> pinLED{ 26U };
+    // Declare GPIO pin attached to the button as input
+    gpio<dir::input> pinButton{ 26U };
+    // Set pull up
     pinButton.set_pull(pull::up);
 
-    /*
-    * Attach lambda created earlier as a callback function for falling edge event
-    * on GPIO pin attached to the button.
-    */
-    pinButton.attach_irq_callback<irq::falling_edge>(blink);
+    for (int i = 0; i < 2; i++)
+    {
+        pinLED = HIGH;      // Use optimized assignment operator.
+        sleep_for(200ms);
+        pinLED = false;     // Use standard assignment operator.
+        sleep_for(200ms);
+        pinLED.write(1);    // Use function to assign value. Value must be convertible to bool.
+        sleep_for(200ms);
+        pinLED = 0;
+        sleep_for(200ms);
+    }
 
-    // Exit after 60s.
-    sleep_for(60s);
+    cout << "Press the button!" << endl;
+
+    for (int i = 0; i < 500; i++)
+    {
+        if (pinButton.read() == 0U)
+        {
+            pinLED = HIGH;
+        }
+        else
+        {
+            pinLED = LOW;
+        }
+
+        sleep_for(20ms);
+    }
 
     return 0;
 }
